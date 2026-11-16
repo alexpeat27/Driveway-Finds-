@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Driveway Finds</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: a working bench. Filters on the left, launch panel pinned on the right; lists below read like a row of windshield price cards. */
+:root{
+  --bg:#eef0ec; --surface:#ffffff; --sunk:#e4e7e1; --ink:#1b2127; --muted:#5a646e; --line:#d3d8d0;
+  --accent:#c8321c; --accent-ink:#ffffff; --flag:#f0bd24; --flag-ink:#2a2205;
+  --good:#1f7a4d; --good-bg:#dff1e6; --warn:#8a5a00; --warn-bg:#f8ecc9;
+  --display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --body:"Barlow","Segoe UI",system-ui,sans-serif;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#14181c; --surface:#1d2329; --sunk:#262d34; --ink:#eceff1; --muted:#9aa5ae; --line:#333c45;
+    --accent:#ef5a3f; --accent-ink:#17100e; --flag:#f0bd24; --flag-ink:#2a2205;
+    --good:#6fd39c; --good-bg:#17382a; --warn:#f0c860; --warn-bg:#3a2f10;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#14181c; --surface:#1d2329; --sunk:#262d34; --ink:#eceff1; --muted:#9aa5ae; --line:#333c45;
+  --accent:#ef5a3f; --accent-ink:#17100e; --flag:#f0bd24; --flag-ink:#2a2205;
+  --good:#6fd39c; --good-bg:#17382a; --warn:#f0c860; --warn-bg:#3a2f10;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%}
+a{color:inherit}
+h1,h2,h3{font-family:var(--display);font-weight:600;letter-spacing:.01em;line-height:1.1;margin:0;text-wrap:balance}
+.wrap{max-width:1120px;margin:0 auto;padding:0 20px 56px}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 28px;padding:22px 0 0;border-bottom:2px solid var(--ink)}
+.brand{display:flex;align-items:baseline;gap:10px;padding-bottom:10px}
+.brand h1{font-size:34px;font-weight:700;text-transform:uppercase}
+.brand span{color:var(--muted);font-size:14px}
+nav.tabs{display:flex;gap:4px;margin-left:auto}
+nav.tabs a{font-family:var(--display);font-size:20px;font-weight:600;text-transform:uppercase;text-decoration:none;padding:9px 16px 8px;border:2px solid transparent;border-bottom:none;border-radius:8px 8px 0 0;color:var(--muted);display:flex;gap:8px;align-items:center}
+nav.tabs a:hover{color:var(--ink)}
+nav.tabs a[aria-current="page"]{background:var(--ink);color:var(--bg)}
+.count{font-family:var(--body);font-size:12px;font-weight:600;background:var(--flag);color:var(--flag-ink);border-radius:20px;padding:1px 8px;font-variant-numeric:tabular-nums}
+.view{display:none;padding-top:24px}
+.view.on{display:block}
+.bench{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(280px,1fr);gap:24px;align-items:start}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px}
+.card h2{font-size:24px;text-transform:uppercase;margin-bottom:4px}
+.sub{color:var(--muted);font-size:14px;margin:0 0 16px}
+fieldset{border:0;padding:0;margin:0 0 18px}
+legend{font-family:var(--display);font-size:16px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:0;margin-bottom:8px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+label.f.wide{grid-column:1/-1}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:500;color:var(--muted)}
+input,select,button{font:inherit}
+input[type=text],input[type=number],input[type=url],select{width:100%;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:9px 10px;font-size:15px;min-height:40px}
+input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible{outline:3px solid var(--flag);outline-offset:2px}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--ink);background:var(--surface);color:var(--ink);border-radius:8px;padding:10px 14px;font-weight:600;font-size:15px;cursor:pointer;text-decoration:none;min-height:42px}
+.btn:hover{background:var(--sunk)}
+.btn.go{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.go:hover{filter:brightness(1.08);background:var(--accent)}
+.btn.flag{background:var(--flag);border-color:var(--flag);color:var(--flag-ink)}
+.btn.flag:hover{filter:brightness(1.05);background:var(--flag)}
+.btn.sm{padding:6px 10px;font-size:13px;min-height:34px}
+.btn.quiet{border-color:var(--line);color:var(--muted);font-weight:500}
+.stack{display:flex;flex-direction:column;gap:10px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.launch{position:sticky;top:16px}
+.plate{font-family:var(--display);font-size:26px;font-weight:700;text-transform:uppercase;line-height:1.1;margin:2px 0 10px;overflow-wrap:anywhere}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+.chip{background:var(--sunk);border-radius:20px;padding:3px 10px;font-size:13px;font-variant-numeric:tabular-nums}
+.note{font-size:13px;color:var(--muted);margin:10px 0 0}
+.pill{display:inline-block;border-radius:5px;padding:2px 8px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.pill.fb{background:var(--sunk);color:var(--ink)}
+.pill.good{background:var(--good-bg);color:var(--good)}
+.pill.warn{background:var(--warn-bg);color:var(--warn)}
+.pill.bad{background:var(--accent);color:var(--accent-ink)}
+.item.branded{border-left-color:var(--accent)}
+.brand-note{grid-column:1/-1;background:var(--warn-bg);color:var(--warn);border-radius:7px;padding:8px 12px;font-size:14px;font-weight:500}
+.pill.new{background:var(--flag);color:var(--flag-ink)}
+.list{display:flex;flex-direction:column;gap:12px}
+.item{background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--line);border-radius:var(--r);padding:16px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px 18px;align-items:start}
+.item.flagged{border-left-color:var(--flag)}
+.item.saved{border-left-color:var(--good)}
+.item h3{font-size:22px;overflow-wrap:anywhere}
+.price{font-family:var(--display);font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.meta{color:var(--muted);font-size:14px;margin:4px 0 8px}
+.actions{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:var(--r);padding:26px 20px;color:var(--muted)}
+.empty strong{color:var(--ink);display:block;font-family:var(--display);font-size:22px;text-transform:uppercase;margin-bottom:4px}
+.cols{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(260px,1fr);gap:24px;align-items:start}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:transparent;color:var(--muted);padding:8px 13px;font-size:14px;font-weight:600;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.bar select{width:auto}
+ol.steps{margin:0;padding-left:20px;font-size:14px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
+ol.steps b{color:var(--ink)}
+.status{font-size:13px;color:var(--muted);padding:10px 0 0;min-height:20px}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:14px;font-weight:500;opacity:0;pointer-events:none;transition:opacity .2s;max-width:calc(100% - 32px)}
+.toast.on{opacity:1}
+.check{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--ink)}
+.check input{width:18px;height:18px;accent-color:var(--accent)}
+@media (max-width:820px){
+  .bench,.cols{grid-template-columns:1fr}
+  .launch{position:static}
+  nav.tabs{margin-left:0;width:100%}
+  nav.tabs a{flex:1;justify-content:center;padding:9px 6px 8px;font-size:18px}
+  .brand h1{font-size:28px}
+}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><h1>Driveway Finds</h1><span>Used cars and trucks, private sellers and dealers</span></div>
+    <nav class="tabs" aria-label="Sections">
+      <a href="#search" data-tab="search">Search</a>
+      <a href="#watchlist" data-tab="watchlist">Watchlist <span class="count" id="n-watch">0</span></a>
+      <a href="#finds" data-tab="finds">Finds <span class="count" id="n-finds">0</span></a>
+    </nav>
+  </header>
+
+  <!-- SEARCH -->
+  <section class="view" id="view-search">
+    <div class="bench">
+      <form class="card" id="f" autocomplete="off">
+        <h2>Build a search</h2>
+        <p class="sub">Fill in what matters and leave the rest blank. The example below is a starting point, change anything.</p>
+        <fieldset>
+          <legend>Vehicle</legend>
+          <div class="grid">
+            <label class="f wide">Makes and models, separated by commas<input type="text" id="vehicles" placeholder="Toyota Tacoma, Ford F-150, Chevrolet"></label>
+            <label class="f">Year
+              <span class="pair"><input type="number" id="yearMin" placeholder="From" min="1950" max="2030" aria-label="Year from"><input type="number" id="yearMax" placeholder="To" min="1950" max="2030" aria-label="Year to"></span>
+            </label>
+            <label class="f">Body style
+              <select id="body"><option value="">Any</option><option value="7">Pickup</option><option value="10">SUV</option><option value="8">Sedan</option><option value="3">Coupe</option><option value="4">Hatchback</option><option value="11">Wagon</option><option value="12">Van</option><option value="5">Minivan</option><option value="2">Convertible</option><option value="6">Off-road</option></select>
+            </label>
+          </div>
+          <p class="note">A make alone works too. Add as many as you like.</p>
+        </fieldset>
+        <fieldset>
+          <legend>Drivetrain and engine</legend>
+          <div class="grid">
+            <label class="f">Drive
+              <select id="drive"><option value="">Any</option><option value="3">4x4 / 4WD</option><option value="2">Rear-wheel</option><option value="1">Front-wheel</option></select>
+            </label>
+            <label class="f">Cylinders
+              <select id="cyl"><option value="">Any</option><option value="2">4 cyl</option><option value="4">6 cyl</option><option value="5">8 cyl</option><option value="6">10 cyl</option></select>
+            </label>
+            <label class="f">Engine size or name<input type="text" id="engine" placeholder="5.3, 6.7 Cummins"></label>
+            <label class="f">Fuel
+              <select id="fuel"><option value="">Any</option><option value="1">Gas</option><option value="2">Diesel</option><option value="3">Hybrid</option><option value="4">Electric</option></select>
+            </label>
+            <label class="f">Transmission
+              <select id="trans"><option value="">Any</option><option value="2">Automatic</option><option value="1">Manual</option></select>
+            </label>
+            <label class="f">Extra keywords<input type="text" id="kw" placeholder="crew cab, plow, one owner"></label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Price, miles, distance</legend>
+          <div class="grid">
+            <label class="f">Price ($)
+              <span class="pair"><input type="number" id="priceMin" placeholder="Min" min="0" step="500" aria-label="Minimum price"><input type="number" id="priceMax" placeholder="Max" min="0" step="500" aria-label="Maximum price"></span>
+            </label>
+            <label class="f">Max mileage<input type="number" id="milesMax" placeholder="100000" min="0" step="5000"></label>
+            <label class="f">ZIP code<input type="text" id="zip" inputmode="numeric" maxlength="5" placeholder="15222"></label>
+            <label class="f">Distance
+              <select id="dist"><option value="10">10 miles</option><option value="15">15 miles</option><option value="25">25 miles</option><option value="50">50 miles</option><option value="75">75 miles</option><option value="100">100 miles</option><option value="250">250 miles</option><option value="500">500 miles</option><option value="750">750 miles</option><option value="1000">1,000 miles</option><option value="any">Anywhere in the US</option></select>
+            </label>
+          </div>
+        </fieldset>
+        <div class="row">
+          <button type="button" class="btn quiet sm" id="clear">Clear all fields</button>
+        </div>
+      </form>
+
+      <aside class="card launch" aria-live="polite">
+        <legend>Your search</legend>
+        <div class="plate" id="plate">Any vehicle</div>
+        <div class="chips" id="chips"></div>
+        <div class="stack">
+          <div class="stack" id="fb-links"></div>
+          <a class="btn go" id="open-cl" target="_blank" rel="noopener">Open on Craigslist, by owner</a>
+          <div class="stack" id="at-links"></div>
+          <button type="button" class="btn flag" id="flag">Flag this search to the Watchlist</button>
+        </div>
+        <p class="note">Each opens in a new tab, newest listings first, private sellers only. Facebook searches one vehicle at a time, so you get a button for each. It takes price, year, mileage and keywords and uses the distance set on your Facebook location. Craigslist stops at 500 miles and only covers the region around your city, so for long distances lean on the many-sites button. Craigslist takes every filter here and all your vehicles at once. The many-sites button runs the search on AutoTempest, which pulls in Cars.com, Carvana, eBay Motors, TrueCar and others; it also takes one vehicle at a time and shows Autotrader, CarGurus and Facebook as links.</p>
+      </aside>
+    </div>
+  </section>
+
+  <!-- WATCHLIST -->
+  <section class="view" id="view-watchlist">
+    <div class="cols">
+      <div>
+        <div class="list" id="watch-list"></div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <h2>Email report</h2>
+          <p class="sub">New matches for flagged searches, sent to your Gmail.</p>
+          <label class="f">How often
+            <select id="digest"><option value="daily">Every day</option><option value="weekly">Once a week (Monday)</option><option value="off">Off, just fill the Finds tab</option></select>
+          </label>
+          <div class="status" id="run-status">No check has run yet.</div>
+        </div>
+        <div class="card">
+          <h2>Turn on alerts once</h2>
+          <p class="sub">The daily check reads alert emails that Facebook and Craigslist send you. Do this for each flagged search.</p>
+          <ol class="steps">
+            <li><b>Facebook:</b> open the search, choose Save search, then make sure Marketplace notifications include Email.</li>
+            <li><b>Craigslist:</b> open the search, choose Save search, and turn on the email alert for it.</li>
+            <li>Tick the boxes on the search here so you know which ones are set up.</li>
+          </ol>
+        </div>
+        <div class="card">
+          <h2>Your area</h2>
+          <div class="grid">
+            <label class="f">Facebook city<input type="text" id="fbCity" placeholder="pittsburgh"></label>
+            <label class="f">Craigslist site<input type="text" id="clSite" placeholder="pittsburgh"></label>
+          </div>
+          <p class="note">These are the city names that appear in each site's web address.</p>
+          <label class="f" style="margin-top:12px">Expected lifespan of a vehicle (miles)<input type="number" id="life" min="100000" max="500000" step="10000" placeholder="200000"></label>
+          <p class="note">Cost per remaining mile is price divided by lifespan minus the odometer. It needs a price and miles on the listing.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FINDS -->
+  <section class="view" id="view-finds">
+    <div class="cols">
+      <div>
+        <div class="bar">
+          <div class="seg" role="group" aria-label="Show">
+            <button type="button" data-show="active" aria-pressed="true">Active</button>
+            <button type="button" data-show="saved" aria-pressed="false">Kept</button>
+            <button type="button" data-show="hidden" aria-pressed="false">Hidden</button>
+          </div>
+          <select id="find-search" aria-label="Filter by flagged search"><option value="">All searches</option></select>
+          <select id="find-sort" aria-label="Sort"><option value="new">Newest first</option><option value="price">Lowest price</option><option value="cpm">Lowest cost per remaining mile</option><option value="deal">Most under budget</option></select>
+        </div>
+        <div class="list" id="find-list"></div>
+      </div>
+      <form class="card" id="add" autocomplete="off">
+        <h2>Add a listing</h2>
+        <p class="sub">Spot one on any car site? Paste its link to track it with the rest. The page cannot open the link itself, so add the price and miles if you want them tracked too.</p>
+        <div class="stack">
+          <label class="f">Listing link from any site<input type="url" id="a-url" placeholder="Paste a link from Cars.com, Autotrader, CarGurus, Facebook..." required></label>
+          <div class="note" id="a-site" style="margin:-4px 0 0">Works with links from any car site.</div>
+          <label class="f">Title (optional, filled in from the link when possible)<input type="text" id="a-title" placeholder="2015 Tacoma TRD 4x4"></label>
+          <div class="pair">
+            <label class="f">Price ($)<input type="number" id="a-price" min="0" step="100"></label>
+            <label class="f">Miles<input type="number" id="a-miles" min="0" step="1000"></label>
+          </div>
+          <label class="f">Title status<select id="a-tstatus"><option value="">Not stated (check the ad)</option><option value="clean">Clean</option><option value="rebuilt">Rebuilt</option><option value="salvage">Salvage</option></select></label>
+          <label class="f">Goes with<select id="a-search"><option value="">No flagged search</option></select></label>
+          <button class="btn go" type="submit">Add to Finds</button>
+        </div>
+      </form>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function(){
+"use strict";
+var $=function(id){return document.getElementById(id)};
+var FIELDS=["vehicles","yearMin","yearMax","body","drive","cyl","engine","fuel","trans","kw","priceMin","priceMax","milesMax","zip","dist"];
+var LABELS={body:{"7":"Pickup","10":"SUV","8":"Sedan","3":"Coupe","4":"Hatchback","11":"Wagon","12":"Van","5":"Minivan","2":"Convertible","6":"Off-road"},
+  drive:{"3":"4x4","2":"RWD","1":"FWD"},cyl:{"2":"4 cyl","4":"6 cyl","5":"8 cyl","6":"10 cyl"},fuel:{"1":"Gas","2":"Diesel","3":"Hybrid","4":"Electric"},trans:{"2":"Automatic","1":"Manual"}};
+var EXAMPLE={vehicles:"Toyota Tacoma",yearMin:"2012",yearMax:"2019",body:"7",drive:"3",cyl:"",engine:"",fuel:"",trans:"",kw:"",priceMin:"",priceMax:"22000",milesMax:"100000",zip:"15222",dist:"50"};
+
+var state={searches:[],finds:[],settings:{fbCity:"pittsburgh",clSite:"pittsburgh",digest:"daily",lifespan:200000},status:null,show:"active"};
+var db=null;
+
+/* ---------- helpers ---------- */
+function money(n){return (n||n===0)&&!isNaN(n)?"$"+Number(n).toLocaleString("en-US"):""}
+function num(v){var n=parseFloat(v);return isNaN(n)?null:n}
+function slug(s,fallback){s=String(s||"").toLowerCase().replace(/[^a-z0-9-]/g,"");return s||fallback}
+function uid(){try{return crypto.randomUUID().replace(/-/g,"").slice(0,20)}catch(e){return "id"+Date.now()+Math.floor(Math.random()*1e6)}}
+var SITES=[["cars.com","Cars.com"],["autotrader.com","Autotrader"],["cargurus.com","CarGurus"],["carmax.com","CarMax"],["carvana.com","Carvana"],["truecar.com","TrueCar"],["edmunds.com","Edmunds"],["ebay.com","eBay Motors"],["carsandbids.com","Cars & Bids"],["bringatrailer.com","Bring a Trailer"],["hemmings.com","Hemmings"],["autotempest.com","AutoTempest"],["facebook.com","Facebook"],["craigslist.org","Craigslist"],["offerup.com","OfferUp"],["copart.com","Copart"],["iaai.com","IAA"],["acvauctions.com","ACV"],["kbb.com","Kelley Blue Book"],["carfax.com","Carfax"],["cargurus.ca","CarGurus"],["privateauto.com","PrivateAuto"],["carsoup.com","CarSoup"],["carsdirect.com","CarsDirect"],["vroom.com","Vroom"]];
+function siteOf(u){try{var h=new URL(u).hostname.replace(/^www\./,"").toLowerCase();
+  for(var i=0;i<SITES.length;i++){if(h===SITES[i][0]||h.slice(-SITES[i][0].length-1)==="."+SITES[i][0])return SITES[i][1]}
+  return h}catch(e){return ""}}
+function guessTitle(u){try{var segs=new URL(u).pathname.split("/").filter(Boolean).map(decodeURIComponent);var best="";
+  segs.forEach(function(s){var t=s.replace(/\.[a-z]{2,5}$/i,"");if(/[a-z]{3}/i.test(t)&&/[-_+]/.test(t)&&t.length>best.length&&!/^(vehicledetail|marketplace|item|listing|vehicle|cars?|used|detail|details)$/i.test(t))best=t});
+  if(!best||!/\b(19[5-9]\d|20[0-3]\d)\b/.test(best.replace(/[-_+]+/g," ")))return "";var w=best.replace(/[-_+]+/g," ").replace(/\b[0-9a-f]{8,}\b/gi,"").replace(/\s+/g," ").trim();
+  return w.replace(/\b([a-z])([a-z]*)/g,function(m,a,b){return a.toUpperCase()+b})}catch(e){return ""}}
+function detectTitle(t){t=String(t||"").toLowerCase();
+  if(/\b(no|not|never|non|without)\W+(a\W+|any\W+)?(salvage|salvaged|rebuilt)\b/.test(t))return "";
+  if(/\b(salvage|salvaged)\b|junk title|total loss|flood (damage|title|car)|parts only/.test(t))return "salvage";
+  if(/\b(rebuilt|reconstructed|branded)\b\W{0,3}(title|status)|\btitle\W{0,3}(rebuilt|reconstructed|branded)\b|\brebuilt\/salvage|\bsalvage\/rebuilt/.test(t))return "rebuilt";
+  return ""}
+function safeUrl(u){try{var x=new URL(String(u));return (x.protocol==="https:"||x.protocol==="http:")?x.href:null}catch(e){return null}}
+function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e}
+var toastT;function toast(msg){var t=$("toast");t.textContent=msg;t.classList.add("on");clearTimeout(toastT);toastT=setTimeout(function(){t.classList.remove("on")},2600)}
+
+function vtext(c){if(c.vehicles!=null&&c.vehicles!=="")return String(c.vehicles);return [c.make,c.model].filter(Boolean).join(" ")}
+function vlist(c){var seen={};return vtext(c).split(/[,;\n]+/).map(function(s){return s.replace(/\s+/g," ").trim()}).filter(function(s){var k=s.toLowerCase();if(!s||seen[k])return false;seen[k]=1;return true})}
+function readForm(){var c={};FIELDS.forEach(function(k){c[k]=$(k).value.trim()});return c}
+function fillForm(c){c=Object.assign({},c,{vehicles:vtext(c)});FIELDS.forEach(function(k){if(c[k]!=null)$(k).value=c[k]});
+  var d=$("dist");if(d.value===""){var n=Number(c.dist)||50,opts=Array.prototype.map.call(d.options,function(o){return Number(o.value)}).filter(function(x){return !isNaN(x)});d.value=String(opts.filter(function(x){return x>=n})[0]||1000)}}
+
+function title(c){var t=vlist(c).join(", ");
+  if(!t)t=LABELS.body[c.body]?("Any "+LABELS.body[c.body]):"Any vehicle";return t}
+function chipList(c){var out=[];
+  if(c.yearMin||c.yearMax)out.push((c.yearMin||"any")+" to "+(c.yearMax||"now"));
+  if(vlist(c).length){if(LABELS.body[c.body])out.push(LABELS.body[c.body])}
+  ["drive","cyl","fuel","trans"].forEach(function(k){if(LABELS[k][c[k]])out.push(LABELS[k][c[k]])});
+  if(c.engine)out.push(c.engine);
+  if(c.kw)out.push(c.kw);
+  if(c.priceMin||c.priceMax)out.push((c.priceMin?money(c.priceMin):"$0")+" to "+(c.priceMax?money(c.priceMax):"any"));
+  if(c.milesMax)out.push("under "+Number(c.milesMax).toLocaleString("en-US")+" mi");
+  if(c.dist==="any")out.push("Anywhere in the US");else if(c.zip)out.push(Number(c.dist).toLocaleString("en-US")+" mi of "+c.zip);
+  return out}
+
+/* ---------- link builders ---------- */
+function fbUrl(c,s,vehicle){
+  var words=[vehicle,c.drive==="3"?"4x4":"",c.fuel==="2"?"diesel":"",c.engine,c.kw].filter(Boolean).join(" ");
+  var p=new URLSearchParams();
+  if(words)p.set("query",words);
+  if(c.priceMin)p.set("minPrice",c.priceMin);
+  if(c.priceMax)p.set("maxPrice",c.priceMax);
+  if(c.yearMin)p.set("minYear",c.yearMin);
+  if(c.yearMax)p.set("maxYear",c.yearMax);
+  if(c.milesMax)p.set("maxMileage",c.milesMax);
+  p.set("sellerType","individual");
+  p.set("topLevelVehicleType","car_truck");
+  p.set("sortBy","creation_time_descend");
+  p.set("exact","false");
+  return "https://www.facebook.com/marketplace/"+slug(s.fbCity,"pittsburgh")+"/"+(words?"search":"vehicles")+"?"+p.toString();
+}
+function fbLinks(c,s){var v=vlist(c);if(!v.length)return [{label:"",url:fbUrl(c,s,"")}];
+  return v.map(function(x){return {label:x,url:fbUrl(c,s,x)}})}
+function atUrl(c,vehicle){
+  var p=new URLSearchParams();var parts=String(vehicle||"").trim().split(/\s+/);
+  if(parts[0])p.set("make",parts[0].toLowerCase());
+  if(parts.length>1)p.set("model",parts.slice(1).join("").toLowerCase());
+  if(/^\d{5}$/.test(c.zip))p.set("zip",c.zip);
+  var d=Number(c.dist)||50,allowed=[25,50,100,300,500,1000],r=allowed.filter(function(x){return x>=d})[0]||1000;p.set("radius",c.dist==="any"?"any":String(r));
+  if(c.yearMin)p.set("minyear",c.yearMin);if(c.yearMax)p.set("maxyear",c.yearMax);
+  if(c.priceMin)p.set("minprice",c.priceMin);if(c.priceMax)p.set("maxprice",c.priceMax);
+  if(c.milesMax)p.set("maxmiles",c.milesMax);
+  return "https://www.autotempest.com/results?"+p.toString();
+}
+function clUrl(c,s){
+  var p=new URLSearchParams();
+  var v=vlist(c),group="";
+  if(v.length===1)p.set("auto_make_model",v[0]);
+  else if(v.length>1)group=v.map(function(x){return x.indexOf(" ")>=0?"("+x+")":x}).join("|");
+  var q=[group,c.engine,c.kw].filter(Boolean).join(" ");
+  if(q)p.set("query",q);
+  if(c.priceMin)p.set("min_price",c.priceMin);
+  if(c.priceMax)p.set("max_price",c.priceMax);
+  if(c.yearMin)p.set("min_auto_year",c.yearMin);
+  if(c.yearMax)p.set("max_auto_year",c.yearMax);
+  if(c.milesMax)p.set("max_auto_miles",c.milesMax);
+  if(c.body)p.set("auto_bodytype",c.body);
+  if(c.drive)p.set("auto_drivetrain",c.drive);
+  if(c.cyl)p.set("auto_cylinders",c.cyl);
+  if(c.fuel)p.set("auto_fuel_type",c.fuel);
+  if(c.trans)p.set("auto_transmission",c.trans);
+  if(/^\d{5}$/.test(c.zip)&&c.dist!=="any"){p.set("postal",c.zip);p.set("search_distance",String(Math.min(Number(c.dist)||50,500)))}
+  p.set("bundleDuplicates","1");
+  p.set("sort","date");
+  return "https://"+slug(s.clSite,"pittsburgh")+".craigslist.org/search/cto?"+p.toString();
+}
+
+
+/* ---------- storage: shared database, with this browser as a fallback ---------- */
+var LS="driveway-finds-v1";
+function loadLocal(){try{var j=JSON.parse(localStorage.getItem(LS)||"null");if(j){state.searches=j.searches||[];state.finds=j.finds||[];state.settings=Object.assign(state.settings,j.settings||{})}}catch(e){}}
+function saveLocal(){if(db)return;try{localStorage.setItem(LS,JSON.stringify({searches:state.searches,finds:state.finds,settings:state.settings}))}catch(e){}}
+function fail(e){toast(e&&e.code==="quota_exceeded"?"Storage is full. Remove some hidden finds and try again.":"That did not save. Check your connection and try again.")}
+
+function putDoc(coll,id,data){
+  if(db)return db.doc(coll+"/"+id).set(data).catch(fail);
+  var arr=state[coll],i=arr.findIndex(function(x){return x.id===id});var row=Object.assign({id:id},data);
+  if(i>=0)arr[i]=row;else arr.push(row);saveLocal();renderAll();return Promise.resolve()}
+function patchDoc(coll,id,data){
+  if(db)return db.doc(coll+"/"+id).update(data).catch(fail);
+  var row=state[coll].find(function(x){return x.id===id});if(row)Object.assign(row,data);saveLocal();renderAll();return Promise.resolve()}
+function dropDoc(coll,id){
+  if(db)return db.doc(coll+"/"+id).delete().catch(fail);
+  state[coll]=state[coll].filter(function(x){return x.id!==id});saveLocal();renderAll();return Promise.resolve()}
+function saveSettings(){
+  if(db)return db.doc("settings/main").set(state.settings).catch(fail);
+  saveLocal();return Promise.resolve()}
+
+/* ---------- render: search ---------- */
+function renderLaunch(){
+  var c=readForm();
+  $("plate").textContent=title(c);
+  var box=$("chips");box.textContent="";
+  var list=chipList(c);
+  if(!list.length)box.appendChild(el("span","chip","No filters yet"));
+  list.forEach(function(t){box.appendChild(el("span","chip",t))});
+  var fb=$("fb-links");fb.textContent="";
+  fbLinks(c,state.settings).forEach(function(l){var a=el("a","btn go",l.label?"Facebook: "+l.label:"Open on Facebook Marketplace");a.href=l.url;a.target="_blank";a.rel="noopener";fb.appendChild(a)});
+  $("open-cl").href=clUrl(c,state.settings);
+  var at=$("at-links");at.textContent="";
+  var vs=vlist(c);if(!vs.length)vs=[""];
+  vs.forEach(function(x){var a=el("a","btn",x?"Many sites at once: "+x:"Many sites at once (AutoTempest)");a.href=atUrl(c,x);a.target="_blank";a.rel="noopener";at.appendChild(a)});
+}
+
+/* ---------- render: watchlist ---------- */
+function renderWatch(){
+  var box=$("watch-list");box.textContent="";
+  $("n-watch").textContent=state.searches.length;
+  if(!state.searches.length){
+    var e=el("div","empty");e.appendChild(el("strong",null,"Nothing flagged yet"));
+    e.appendChild(document.createTextNode("Build a search on the Search tab and choose Flag this search. Flagged searches are the ones the daily check and the email report follow."));
+    box.appendChild(e);return}
+  state.searches.slice().sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0)}).forEach(function(s){
+    var c=s.criteria||{};
+    var it=el("div","item flagged");
+    var left=el("div");left.appendChild(el("h3",null,s.name||title(c)));
+    var chips=el("div","chips");chips.style.margin="8px 0 0";
+    chipList(c).forEach(function(t){chips.appendChild(el("span","chip",t))});left.appendChild(chips);
+    var n=state.finds.filter(function(f){return f.searchId===s.id&&f.status!=="hidden"}).length;
+    var right=el("div");right.appendChild(el("div","price",String(n)));right.appendChild(el("div","meta",n===1?"find":"finds"));
+    right.style.textAlign="right";
+    var act=el("div","actions");
+    fbLinks(c,state.settings).forEach(function(l){var a1=el("a","btn sm go",l.label?"Facebook: "+l.label:"Facebook");a1.href=l.url;a1.target="_blank";a1.rel="noopener";act.appendChild(a1)});
+    var a2=el("a","btn sm go","Craigslist");a2.href=clUrl(c,state.settings);a2.target="_blank";a2.rel="noopener";
+    var ed=el("button","btn sm","Edit in Search");ed.type="button";
+    ed.addEventListener("click",function(){$("f").reset();fillForm(Object.assign({},blank(),c));renderLaunch();location.hash="search"});
+    var rm=el("button","btn sm quiet","Remove");rm.type="button";
+    rm.addEventListener("click",function(){dropDoc("searches",s.id).then(function(){toast("Removed from the Watchlist")})});
+    act.appendChild(a2);act.appendChild(ed);act.appendChild(rm);
+    ["fb","cl"].forEach(function(k){
+      var lab=el("label","check");var cb=document.createElement("input");cb.type="checkbox";cb.id="al-"+k+"-"+s.id;cb.checked=!!(s.alerts&&s.alerts[k]);
+      cb.addEventListener("change",function(){var al=Object.assign({fb:false,cl:false},s.alerts||{});al[k]=cb.checked;patchDoc("searches",s.id,{alerts:al})});
+      lab.appendChild(cb);lab.appendChild(document.createTextNode(k==="fb"?"Facebook alert on":"Craigslist alert on"));act.appendChild(lab)});
+    it.appendChild(left);it.appendChild(right);it.appendChild(act);box.appendChild(it)});
+}
+function blank(){var b={};FIELDS.forEach(function(k){b[k]=""});b.dist="50";return b}
+
+/* ---------- render: finds ---------- */
+function cpm(f){var p=num(f.price),m=num(f.miles),L=Number(state.settings.lifespan)||200000;return (p>0&&m!=null&&m>=0&&m<L)?p/(L-m):null}
+function budgetGap(f){var s=state.searches.find(function(x){return x.id===f.searchId});var max=s&&s.criteria?num(s.criteria.priceMax):null;var p=num(f.price);
+  if(!max||p==null||p<=0)return null;return Math.round((max-p)/max*100)}
+function renderFinds(){
+  var box=$("find-list");box.textContent="";
+  var active=state.finds.filter(function(f){return f.status!=="hidden"});
+  $("n-finds").textContent=active.length;
+  var sel=$("find-search").value,sort=$("find-sort").value;
+  var rows=state.finds.filter(function(f){
+    if(state.show==="hidden")return f.status==="hidden";
+    if(state.show==="saved")return f.status==="saved";
+    return f.status!=="hidden"}).filter(function(f){return !sel||f.searchId===sel});
+  rows.sort(function(a,b){
+    if(sort==="cpm"){var A=cpm(a),B=cpm(b);return (A==null?1e9:A)-(B==null?1e9:B)}
+    if(sort==="price")return (num(a.price)==null?1e12:num(a.price))-(num(b.price)==null?1e12:num(b.price));
+    if(sort==="deal")return (budgetGap(b)==null?-999:budgetGap(b))-(budgetGap(a)==null?-999:budgetGap(a));
+    return (b.foundAt||0)-(a.foundAt||0)});
+  if(!rows.length){
+    var e=el("div","empty");
+    if(!state.finds.length){e.appendChild(el("strong",null,"No finds yet"));
+      e.appendChild(document.createTextNode("Listings land here two ways: the daily check adds new matches from your alert emails, and you can add any listing yourself with the form on this page."))}
+    else{e.appendChild(el("strong",null,"Nothing in this view"));e.appendChild(document.createTextNode("Try another filter above."))}
+    box.appendChild(e);return}
+  rows.forEach(function(f){
+    var ts=f.titleStatus||detectTitle((f.title||"")+" "+(f.note||""));var branded=ts==="salvage"||ts==="rebuilt";
+    var it=el("div","item"+(f.status==="saved"?" saved":"")+(branded?" branded":""));
+    var left=el("div");left.appendChild(el("h3",null,f.title||"Untitled listing"));
+    var bits=[];if(f.year)bits.push(String(f.year));if(num(f.miles)!=null)bits.push(Number(f.miles).toLocaleString("en-US")+" mi");if(f.location)bits.push(f.location);
+    var s=state.searches.find(function(x){return x.id===f.searchId});if(s)bits.push("for "+(s.name||title(s.criteria||{})));
+    if(f.foundAt)bits.push("found "+new Date(f.foundAt).toLocaleDateString("en-US",{month:"short",day:"numeric"}));
+    left.appendChild(el("div","meta",bits.join("  ·  ")));
+    var pills=el("div","row");
+    pills.appendChild(el("span","pill fb",f.sourceName||(f.source==="craigslist"?"Craigslist":f.source==="facebook"?"Facebook":"Added by you")));
+    if(f.status==="new")pills.appendChild(el("span","pill new","New"));
+    if(branded)pills.appendChild(el("span","pill bad",ts==="salvage"?"Salvage title":"Rebuilt title"));
+    else if(ts==="clean")pills.appendChild(el("span","pill good","Clean title"));
+    else pills.appendChild(el("span","pill fb","Title not stated"));
+    var mi=num(f.miles);if(mi!=null&&mi>=0&&mi<100000)pills.appendChild(el("span","pill good","Under 100k miles"));
+    var cp=cpm(f);if(cp!=null)pills.appendChild(el("span","pill fb","$"+cp.toFixed(2)+" per remaining mile"));
+    if(f.sellerType==="dealer")pills.appendChild(el("span","pill fb","Dealer"));else if(f.sellerType==="private")pills.appendChild(el("span","pill fb","Private seller"));
+    var gap=budgetGap(f);
+    if(gap!=null&&gap>=10)pills.appendChild(el("span","pill good",gap+"% under your max"));
+    else if(gap!=null&&gap<0)pills.appendChild(el("span","pill warn",Math.abs(gap)+"% over your max"));
+    left.appendChild(pills);
+    if(f.note){var nt=el("div","meta",f.note);nt.style.margin="8px 0 0";left.appendChild(nt)}
+    var right=el("div","price",money(num(f.price))||"No price");
+    var bn=null;if(branded){bn=el("div","brand-note",(ts==="salvage"?"Salvage title. ":"Rebuilt title. ")+"Not recommended. Ask for the damage history and the title papers before going further.")}
+    var act=el("div","actions");
+    var href=safeUrl(f.url);
+    if(href){var a=el("a","btn sm go","Open listing");a.href=href;a.target="_blank";a.rel="noopener";act.appendChild(a)}
+    if(f.status!=="saved"){var sv=el("button","btn sm go","Keep");sv.type="button";sv.addEventListener("click",function(){patchDoc("finds",f.id,{status:"saved"})});act.appendChild(sv)}
+    else{var us=el("button","btn sm","Move out of Kept");us.type="button";us.addEventListener("click",function(){patchDoc("finds",f.id,{status:"seen"})});act.appendChild(us)}
+    if(f.status!=="hidden"){var hd=el("button","btn sm quiet","Hide, never show again");hd.type="button";hd.addEventListener("click",function(){patchDoc("finds",f.id,{status:"hidden"})});act.appendChild(hd)}
+    else{var rs=el("button","btn sm","Restore");rs.type="button";rs.addEventListener("click",function(){patchDoc("finds",f.id,{status:"seen"})});act.appendChild(rs);
+      var del=el("button","btn sm quiet","Delete for good");del.type="button";del.addEventListener("click",function(){dropDoc("finds",f.id)});act.appendChild(del)}
+    it.appendChild(left);it.appendChild(right);if(bn)it.appendChild(bn);it.appendChild(act);box.appendChild(it)});
+}
+function renderSelects(){
+  [["find-search","All searches"],["a-search","No flagged search"]].forEach(function(p){
+    var s=$(p[0]),keep=s.value;s.textContent="";var o=el("option",null,p[1]);o.value="";s.appendChild(o);
+    state.searches.forEach(function(x){var op=el("option",null,x.name||title(x.criteria||{}));op.value=x.id;s.appendChild(op)});
+    s.value=state.searches.some(function(x){return x.id===keep})?keep:""});
+}
+function renderSettings(){
+  if(document.activeElement!==$("fbCity"))$("fbCity").value=state.settings.fbCity||"";
+  if(document.activeElement!==$("clSite"))$("clSite").value=state.settings.clSite||"";
+  $("digest").value=state.settings.digest||"daily";
+  if(document.activeElement!==$("life"))$("life").value=state.settings.lifespan||200000;
+  var st=state.status;
+  $("run-status").textContent=st&&st.lastRun?("Last check: "+new Date(st.lastRun).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})+(st.added!=null?", "+st.added+" new":"")+(st.note?". "+st.note:"")):"No check has run yet.";
+}
+function renderAll(){renderLaunch();renderSelects();renderWatch();renderFinds();renderSettings()}
+
+/* ---------- events ---------- */
+$("f").addEventListener("input",renderLaunch);
+$("f").addEventListener("submit",function(e){e.preventDefault()});
+$("clear").addEventListener("click",function(){fillForm(blank());renderLaunch()});
+$("flag").addEventListener("click",function(){
+  var c=readForm();var name=title(c)+(c.yearMin||c.yearMax?" "+(c.yearMin||"")+"-"+(c.yearMax||""):"");
+  putDoc("searches",uid(),{name:name.trim(),criteria:c,alerts:{fb:false,cl:false},createdAt:Date.now()}).then(function(){toast("Flagged. It is on the Watchlist.")})});
+$("life").addEventListener("change",function(){var v=Math.round(Number($("life").value));if(!(v>=100000&&v<=500000)){toast("Enter a lifespan between 100,000 and 500,000 miles");$("life").value=state.settings.lifespan||200000;return}
+  state.settings.lifespan=v;saveSettings().then(function(){renderFinds();toast("Lifespan saved")})});
+$("digest").addEventListener("change",function(){state.settings.digest=$("digest").value;saveSettings().then(function(){toast("Report schedule saved")})});
+["fbCity","clSite"].forEach(function(k){$(k).addEventListener("change",function(){state.settings[k]=slug($(k).value,"pittsburgh");$(k).value=state.settings[k];saveSettings();renderLaunch();renderWatch()})});
+document.querySelectorAll(".seg button").forEach(function(b){b.addEventListener("click",function(){state.show=b.dataset.show;
+  document.querySelectorAll(".seg button").forEach(function(x){x.setAttribute("aria-pressed",x===b?"true":"false")});renderFinds()})});
+$("find-search").addEventListener("change",renderFinds);
+$("find-sort").addEventListener("change",renderFinds);
+$("a-url").addEventListener("input",function(){var u=safeUrl($("a-url").value.trim());var n=u?siteOf(u):"";
+  $("a-site").textContent=n?("Looks like a link from "+n+"."):"Works with links from any car site."});
+$("add").addEventListener("submit",function(e){e.preventDefault();
+  var href=safeUrl($("a-url").value.trim());if(!href){toast("That link does not look right. Paste the full address starting with https://");return}
+  var host="";try{host=new URL(href).hostname}catch(x){}
+  var site=siteOf(href);var t=$("a-title").value.trim()||guessTitle(href)||("Listing from "+site);var ym=(t+" "+href).match(/\b(19[5-9]\d|20[0-3]\d)\b/);
+  putDoc("finds",uid(),{url:href,title:t,price:num($("a-price").value),miles:num($("a-miles").value),year:ym?Number(ym[1]):null,
+    source:/facebook\.com$/.test(host)?"facebook":/craigslist\.org$/.test(host)?"craigslist":"manual",sourceName:site,titleStatus:$("a-tstatus").value||detectTitle(t),searchId:$("a-search").value||"",status:"saved",foundAt:Date.now()})
+  .then(function(){$("add").reset();toast("Added to Finds")})});
+
+/* ---------- tabs ---------- */
+function route(){var h=(location.hash||"").replace("#","");if(["search","watchlist","finds"].indexOf(h)<0)h="search";
+  document.querySelectorAll(".view").forEach(function(v){v.classList.toggle("on",v.id==="view-"+h)});
+  document.querySelectorAll("nav.tabs a").forEach(function(a){if(a.dataset.tab===h)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")})}
+window.addEventListener("hashchange",route);
+
+/* ---------- start ---------- */
+fillForm(EXAMPLE);loadLocal();route();renderAll();
+
+function rows(snap){return snap.docs.map(function(d){return Object.assign({id:d.id},d.data())})}
+function connect(){
+  if(!window.claude||typeof window.claude.use!=="function")return;
+  window.claude.use("db").then(function(ns){
+    if(!ns)return;db=ns;
+    var slow=setTimeout(function(){toast("Your saved data is taking a while to load.")},10000);
+    var clear=function(){clearTimeout(slow)};
+    db.collection("searches").onSnapshot(function(s){clear();state.searches=rows(s);renderSelects();renderWatch();renderFinds()},clear);
+    db.collection("finds").onSnapshot(function(s){clear();state.finds=rows(s);renderWatch();renderFinds()},clear);
+    db.doc("settings/main").onSnapshot(function(d){if(d.exists){state.settings=Object.assign({fbCity:"pittsburgh",clSite:"pittsburgh",digest:"daily",lifespan:200000},d.data());renderSettings();renderLaunch();renderWatch()}},function(){});
+    db.doc("settings/status").onSnapshot(function(d){state.status=d.exists?d.data():null;renderSettings()},function(){});
+  }).catch(function(){});
+}
+connect();
+})();
+</script>
+</body>
+</html>
