@@ -10,6 +10,9 @@ var FIELDS=["vehicles","yearMin","yearMax","body","drive","cyl","engine","fuel",
 var LABELS={body:{pickup:"Pickup",suv:"SUV",sedan:"Sedan",coupe:"Coupe",hatchback:"Hatchback",wagon:"Wagon",convertible:"Convertible",van:"Van",minivan:"Minivan"},
   drive:{"4wd":"4x4","awd":"AWD","rwd":"RWD","fwd":"FWD"},cyl:{"4":"4 cyl","6":"6 cyl","8":"8 cyl","10":"10 cyl"},
   fuel:{gas:"Gas",diesel:"Diesel",hybrid:"Hybrid",electric:"Electric"},trans:{automatic:"Automatic",manual:"Manual"}};
+/* "01" means 2001 and "85" means 1985. Returns a 4-digit string, or the input when it isn't a year. */
+function fullYear(v,now){var t=String(v==null?"":v).trim();if(!/^\d{1,2}$/.test(t))return t;var n=parseInt(t,10),yy=((now||new Date()).getFullYear()%100)+1;
+  return String(n<=yy?2000+n:1900+n)}
 /* Searches saved before the switch to one Search button used Craigslist's number codes. */
 var OLD_CODES={body:{"7":"pickup","10":"suv","8":"sedan","3":"coupe","4":"hatchback","11":"wagon","12":"van","5":"minivan","2":"convertible","6":""},
   drive:{"3":"4wd","2":"rwd","1":"fwd"},cyl:{"2":"4","4":"6","5":"8","6":"10"},fuel:{"1":"gas","2":"diesel","3":"hybrid","4":"electric"},trans:{"2":"automatic","1":"manual"}};
@@ -175,7 +178,7 @@ function mergePlan(state,backup){
   return {searches:searches,finds:finds,skipped:(backup.searches.length-searches.length)+(backup.finds.length-finds.length)}}
 
 return {FIELDS:FIELDS,LABELS:LABELS,STAGES:STAGES,money:money,num:num,slug:slug,safeUrl:safeUrl,vtext:vtext,vlist:vlist,splitVehicle:splitVehicle,
-  title:title,chipList:chipList,criteriaKey:criteriaKey,sameCriteria:sameCriteria,migrateCriteria:migrateCriteria,
+  title:title,chipList:chipList,fullYear:fullYear,criteriaKey:criteriaKey,sameCriteria:sameCriteria,migrateCriteria:migrateCriteria,
   siteOf:siteOf,guessTitle:guessTitle,detectTitle:detectTitle,normUrl:normUrl,findByUrl:findByUrl,cpm:cpm,budgetGap:budgetGap,
   withPrice:withPrice,priceChange:priceChange,cleanVin:cleanVin,checkVin:checkVin,findVin:findVin,parseVpic:parseVpic,parseRecalls:parseRecalls,
   vpicUrl:vpicUrl,recallsUrl:recallsUrl,vinRecallPage:vinRecallPage,makeBackup:makeBackup,readBackup:readBackup,mergePlan:mergePlan};

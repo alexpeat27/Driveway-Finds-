@@ -192,6 +192,21 @@ test("a body style alone is a valid search; junk filter values are ignored", asy
   assert.equal(r.status, 400);
 });
 
+test("two-digit and backwards years, and model spellings with or without a dash", async () => {
+  assert.deepEqual([W.fullYear("01"), W.fullYear("85"), W.fullYear("2019"), W.fullYear("")], [2001, 1985, 2019, null]);
+  const c = W.readCriteria(new URLSearchParams("vehicles=chevy s-10&yearMin=01&yearMax=1985"));
+  assert.deepEqual([c.yearMin, c.yearMax], [1985, 2001]);
+  assert.equal(W.modelSpellings("s10"), "s10,s-10");
+  assert.equal(W.modelSpellings("f-150"), "f-150,f150");
+  assert.equal(W.modelSpellings("tacoma"), "tacoma");
+  mock();
+  await W.default.fetch(req("vehicles=chevy+s10&yearMin=1985&yearMax=01"), ENV);
+  const p = new URL(calls.find((x) => x.url.includes("api.auto.dev")).url).searchParams;
+  assert.equal(p.get("vehicle.make"), "Chevrolet");
+  assert.equal(p.get("vehicle.model"), "s10,s-10");
+  assert.equal(p.get("vehicle.year"), "1985-2001");
+});
+
 test("no vehicle is a clear error", async () => {
   mock();
   const r = await W.default.fetch(req("vehicles="), ENV);

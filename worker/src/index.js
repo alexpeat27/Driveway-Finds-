@@ -85,6 +85,28 @@ function int(v, min, max) {
   if (isNaN(n)) return null;
   return Math.min(Math.max(n, min), max);
 }
+/* "01" means 2001 and "85" means 1985; a range typed backwards is swapped. */
+export function fullYear(v) {
+  const s = String(v == null ? "" : v).replace(/[^\d]/g, "");
+  if (!s) return null;
+  let n = parseInt(s, 10);
+  if (s.length <= 2) n += n <= (new Date().getFullYear() % 100) + 1 ? 2000 : 1900;
+  return Math.min(Math.max(n, 1950), 2035);
+}
+function years(a, b) {
+  let yearMin = fullYear(a), yearMax = fullYear(b);
+  if (yearMin && yearMax && yearMin > yearMax) [yearMin, yearMax] = [yearMax, yearMin];
+  return { yearMin, yearMax };
+}
+/* Model names are spelled with and without a dash ("S10" and "S-10", "F150" and "F-150").
+   Auto.dev treats a comma as "or", so send both spellings. */
+export function modelSpellings(m) {
+  const out = [m];
+  const dashed = m.replace(/\b([a-z]{1,3})(\d{2,4})\b/gi, "$1-$2");
+  const plain = m.replace(/\b([a-z]{1,3})-(\d{2,4})\b/gi, "$1$2");
+  for (const x of [dashed, plain]) if (!out.includes(x)) out.push(x);
+  return out.join(",");
+}
 export function readCriteria(p) {
   const seen = {};
   const vehicles = String(p.get("vehicles") || "").split(/[,;\n]+/).map((s) => s.replace(/[^\w\s.-]/g, "").replace(/\s+/g, " ").trim())
@@ -93,7 +115,7 @@ export function readCriteria(p) {
   const dist = p.get("dist") === "any" ? null : int(p.get("dist"), 1, 1000) || 50;
   return {
     vehicles,
-    yearMin: int(p.get("yearMin"), 1950, 2035), yearMax: int(p.get("yearMax"), 1950, 2035),
+    ...years(p.get("yearMin"), p.get("yearMax")),
     priceMin: int(p.get("priceMin"), 0, 10000000), priceMax: int(p.get("priceMax"), 0, 10000000),
     milesMax: int(p.get("milesMax"), 0, 2000000), zip, dist,
     keywords: String(p.get("kw") || "").slice(0, 80),
@@ -280,7 +302,7 @@ async function marketcheck(c, mm, env, kind) {
 async function autodev(c, mm, env) {
   const p = new URLSearchParams({ limit: String(MAX_PER_SOURCE) }); // the free plan returns at most 20
   if (mm.make) p.set("vehicle.make", properMake(mm.make));
-  if (mm.model) p.set("vehicle.model", mm.model);
+  if (mm.model) p.set("vehicle.model", modelSpellings(mm.model));
   if (c.yearMin || c.yearMax) p.set("vehicle.year", (c.yearMin || 1950) + "-" + (c.yearMax || 2035));
   if (c.priceMin || c.priceMax) p.set("retailListing.price", (c.priceMin || 1) + "-" + (c.priceMax || 10000000));
   if (c.milesMax) p.set("retailListing.miles", "0-" + c.milesMax);
