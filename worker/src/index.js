@@ -225,7 +225,8 @@ async function marketcheck(c, mm, env, kind) {
   if (c.yearMin || c.yearMax) p.set("year_range", (c.yearMin || 1950) + "-" + (c.yearMax || 2035));
   if (c.priceMin || c.priceMax) p.set("price_range", (c.priceMin || 0) + "-" + (c.priceMax || 10000000));
   if (c.milesMax) p.set("miles_range", "0-" + c.milesMax);
-  if (c.zip) { p.set("zip", c.zip); p.set("radius", String(Math.min(c.dist || 100, 100))); }
+  // "Anywhere in the US" sends no ZIP. The free plan caps the radius at 100 miles.
+  if (c.zip && c.dist) { p.set("zip", c.zip); p.set("radius", String(Math.min(c.dist, 100))); }
   const path = kind === "private" ? "/v2/search/car/fsbo/active" : "/v2/search/car/active";
   const j = await getJson("https://api.marketcheck.com" + path + "?" + p.toString());
   return (j.listings || []).map((x) => {
@@ -245,13 +246,14 @@ async function marketcheck(c, mm, env, kind) {
    GET https://api.auto.dev/listings with "Authorization: Bearer <key>". Ranges are written min-max.
    Free plan: 1,000 calls a month. */
 async function autodev(c, mm, env) {
-  const p = new URLSearchParams({ limit: String(MAX_PER_SOURCE) });
+  const p = new URLSearchParams({ limit: String(MAX_PER_SOURCE) }); // the free plan returns at most 20
   if (mm.make) p.set("vehicle.make", properMake(mm.make));
   if (mm.model) p.set("vehicle.model", mm.model);
   if (c.yearMin || c.yearMax) p.set("vehicle.year", (c.yearMin || 1950) + "-" + (c.yearMax || 2035));
   if (c.priceMin || c.priceMax) p.set("retailListing.price", (c.priceMin || 1) + "-" + (c.priceMax || 10000000));
   if (c.milesMax) p.set("retailListing.miles", "0-" + c.milesMax);
-  if (c.zip) { p.set("zip", c.zip); if (c.dist) p.set("distance", String(c.dist)); }
+  // Auto.dev reads a ZIP without a distance as "this ZIP only", so "Anywhere in the US" sends neither.
+  if (c.zip && c.dist) { p.set("zip", c.zip); p.set("distance", String(c.dist)); }
   const j = await getJson("https://api.auto.dev/listings?" + p.toString(), { headers: { Authorization: "Bearer " + env.AUTODEV_KEY } });
   const rows = Array.isArray(j) ? j : j.data || j.records || j.listings || [];
   return rows.map((x) => {
