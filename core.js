@@ -6,10 +6,21 @@
 })(typeof self!=="undefined"?self:this,function(){
 "use strict";
 
-var FIELDS=["vehicles","yearMin","yearMax","body","drive","cyl","engine","fuel","trans","kw","priceMin","priceMax","milesMax","zip","dist"];
-var LABELS={body:{"7":"Pickup","10":"SUV","8":"Sedan","3":"Coupe","4":"Hatchback","11":"Wagon","12":"Van","5":"Minivan","2":"Convertible","6":"Off-road"},
-  drive:{"3":"4x4","2":"RWD","1":"FWD"},cyl:{"2":"4 cyl","4":"6 cyl","5":"8 cyl","6":"10 cyl"},fuel:{"1":"Gas","2":"Diesel","3":"Hybrid","4":"Electric"},trans:{"2":"Automatic","1":"Manual"}};
-var FILTER_NAMES={yearMin:"year",yearMax:"year",body:"body style",drive:"drive",cyl:"cylinders",engine:"engine",fuel:"fuel",trans:"transmission",kw:"keywords",priceMin:"min price",priceMax:"max price",milesMax:"mileage",zip:"ZIP and distance"};
+var FIELDS=["vehicles","yearMin","yearMax","body","drive","cyl","engine","fuel","trans","priceMin","priceMax","milesMax","zip","dist"];
+var LABELS={body:{pickup:"Pickup",suv:"SUV",sedan:"Sedan",coupe:"Coupe",hatchback:"Hatchback",wagon:"Wagon",convertible:"Convertible",van:"Van",minivan:"Minivan"},
+  drive:{"4wd":"4x4","awd":"AWD","rwd":"RWD","fwd":"FWD"},cyl:{"4":"4 cyl","6":"6 cyl","8":"8 cyl","10":"10 cyl"},
+  fuel:{gas:"Gas",diesel:"Diesel",hybrid:"Hybrid",electric:"Electric"},trans:{automatic:"Automatic",manual:"Manual"}};
+/* Searches saved before the switch to one Search button used Craigslist's number codes. */
+var OLD_CODES={body:{"7":"pickup","10":"suv","8":"sedan","3":"coupe","4":"hatchback","11":"wagon","12":"van","5":"minivan","2":"convertible","6":""},
+  drive:{"3":"4wd","2":"rwd","1":"fwd"},cyl:{"2":"4","4":"6","5":"8","6":"10"},fuel:{"1":"gas","2":"diesel","3":"hybrid","4":"electric"},trans:{"2":"automatic","1":"manual"}};
+/* New searches carry fmt:2. Anything without it is the old format, whose codes overlap the new values
+   (old cylinder code "4" meant 6 cylinders), so the marker decides, never the value itself. */
+function migrateCriteria(c){c=Object.assign({},c||{});
+  if(c.fmt!==2)Object.keys(OLD_CODES).forEach(function(k){var v=c[k]==null?"":String(c[k]);if(v)c[k]=OLD_CODES[k].hasOwnProperty(v)?OLD_CODES[k][v]:""});
+  Object.keys(LABELS).forEach(function(k){if(c[k]&&!LABELS[k][c[k]])c[k]=""});
+  c.fmt=2;
+  if(c.dist&&c.dist!=="any"&&!/^(25|50|100|250|500|1000)$/.test(String(c.dist))){var n=Number(c.dist)||50;c.dist=String([25,50,100,250,500,1000].filter(function(x){return x>=n})[0]||1000)}
+  delete c.kw;return c}
 var STAGES=[["","No stage yet"],["contacted","Contacted seller"],["testdrive","Test drive set"],["inspected","Inspected"],["offer","Offer made"],["passed","Passed on it"]];
 
 /* ---------- small helpers ---------- */
@@ -38,9 +49,9 @@ function splitVehicle(v){
 }
 
 /* ---------- search summary ---------- */
-function title(c){var t=vlist(c).join(", ");
+function title(c){c=migrateCriteria(c);var t=vlist(c).join(", ");
   if(!t)t=LABELS.body[c.body]?("Any "+LABELS.body[c.body]):"Any vehicle";return t}
-function chipList(c){var out=[];
+function chipList(c){c=migrateCriteria(c);var out=[];
   if(c.yearMin||c.yearMax)out.push((c.yearMin||"any")+" to "+(c.yearMax||"now"));
   if(vlist(c).length){if(LABELS.body[c.body])out.push(LABELS.body[c.body])}
   ["drive","cyl","fuel","trans"].forEach(function(k){if(LABELS[k][c[k]])out.push(LABELS[k][c[k]])});
@@ -52,113 +63,12 @@ function chipList(c){var out=[];
   return out}
 
 /* Two searches are the same when every field matches, ignoring case, spacing and vehicle order. */
-function criteriaKey(c){c=c||{};var o={};
+function criteriaKey(c){c=migrateCriteria(c);var o={};
   FIELDS.forEach(function(k){var v=String(c[k]==null?"":c[k]).trim().toLowerCase().replace(/\s+/g," ");o[k]=v});
   o.vehicles=vlist(c).map(function(s){return s.toLowerCase()}).sort().join("|");
-  if(!o.dist)o.dist="50";
+  if(!o.dist)o.dist="any";
   return JSON.stringify(o)}
 function sameCriteria(a,b){return criteriaKey(a)===criteriaKey(b)}
-
-/* ---------- link builders ---------- */
-/* Which filters each site actually applies. Anything set but not listed is skipped by that site. */
-var SUPPORTS={
-  facebook:["yearMin","yearMax","drive","fuel","engine","kw","priceMin","priceMax","milesMax"],
-  craigslist:["yearMin","yearMax","body","drive","cyl","engine","fuel","trans","kw","priceMin","priceMax","milesMax","zip"],
-  autotempest:["yearMin","yearMax","priceMin","priceMax","milesMax","zip"],
-  carscom:["yearMin","yearMax","priceMax","milesMax","zip"],
-  offerup:["engine","kw","priceMin","priceMax"]
-};
-/* Facebook only understands two values as words: 4x4 and diesel. */
-function skippedFilters(site,c){
-  var ok=SUPPORTS[site]||[],seen={},out=[];
-  Object.keys(FILTER_NAMES).forEach(function(k){
-    var v=c[k];if(v==null||v==="")return;
-    var used=ok.indexOf(k)>=0;
-    if(site==="facebook"&&k==="drive"&&v!=="3")used=false;
-    if(site==="facebook"&&k==="fuel"&&v!=="2")used=false;
-    if(k==="zip"&&c.dist==="any")return;
-    var n=FILTER_NAMES[k];if(!used&&!seen[n]){seen[n]=1;out.push(n)}});
-  return out}
-
-function fbUrl(c,s,vehicle){
-  var words=[vehicle,c.drive==="3"?"4x4":"",c.fuel==="2"?"diesel":"",c.engine,c.kw].filter(Boolean).join(" ");
-  var p=new URLSearchParams();
-  if(words)p.set("query",words);
-  if(c.priceMin)p.set("minPrice",c.priceMin);
-  if(c.priceMax)p.set("maxPrice",c.priceMax);
-  if(c.yearMin)p.set("minYear",c.yearMin);
-  if(c.yearMax)p.set("maxYear",c.yearMax);
-  if(c.milesMax)p.set("maxMileage",c.milesMax);
-  p.set("sellerType","individual");
-  p.set("topLevelVehicleType","car_truck");
-  p.set("sortBy","creation_time_descend");
-  p.set("exact","false");
-  return "https://www.facebook.com/marketplace/"+slug(s.fbCity,"pittsburgh")+"/"+(words?"search":"vehicles")+"?"+p.toString();
-}
-function fbLinks(c,s){var v=vlist(c);if(!v.length)return [{label:"",url:fbUrl(c,s,"")}];
-  return v.map(function(x){return {label:x,url:fbUrl(c,s,x)}})}
-
-function atUrl(c,vehicle){
-  var p=new URLSearchParams();var mm=splitVehicle(vehicle);
-  if(mm.make)p.set("make",mm.make.replace(/[^a-z0-9]/g,""));
-  if(mm.model)p.set("model",mm.model.replace(/\s+/g,""));
-  if(/^\d{5}$/.test(c.zip))p.set("zip",c.zip);
-  var d=Number(c.dist)||50,allowed=[25,50,100,300,500,1000],r=allowed.filter(function(x){return x>=d})[0]||1000;p.set("radius",c.dist==="any"?"any":String(r));
-  if(c.yearMin)p.set("minyear",c.yearMin);if(c.yearMax)p.set("maxyear",c.yearMax);
-  if(c.priceMin)p.set("minprice",c.priceMin);if(c.priceMax)p.set("maxprice",c.priceMax);
-  if(c.milesMax)p.set("maxmiles",c.milesMax);
-  return "https://www.autotempest.com/results?"+p.toString();
-}
-
-function clUrl(c,s,site){
-  var p=new URLSearchParams();
-  var v=vlist(c),group="";
-  if(v.length===1)p.set("auto_make_model",v[0]);
-  else if(v.length>1)group=v.map(function(x){return x.indexOf(" ")>=0?"("+x+")":x}).join("|");
-  var q=[group,c.engine,c.kw].filter(Boolean).join(" ");
-  if(q)p.set("query",q);
-  if(c.priceMin)p.set("min_price",c.priceMin);
-  if(c.priceMax)p.set("max_price",c.priceMax);
-  if(c.yearMin)p.set("min_auto_year",c.yearMin);
-  if(c.yearMax)p.set("max_auto_year",c.yearMax);
-  if(c.milesMax)p.set("max_auto_miles",c.milesMax);
-  if(c.body)p.set("auto_bodytype",c.body);
-  if(c.drive)p.set("auto_drivetrain",c.drive);
-  if(c.cyl)p.set("auto_cylinders",c.cyl);
-  if(c.fuel)p.set("auto_fuel_type",c.fuel);
-  if(c.trans)p.set("auto_transmission",c.trans);
-  if(/^\d{5}$/.test(c.zip)&&c.dist!=="any"){p.set("postal",c.zip);p.set("search_distance",String(Math.min(Number(c.dist)||50,500)))}
-  p.set("bundleDuplicates","1");
-  p.set("sort","date");
-  return "https://"+slug(site||s.clSite,"pittsburgh")+".craigslist.org/search/cto?"+p.toString();
-}
-/* The main Craigslist site first, then any nearby sites from settings, without repeats. */
-function clSites(s){var seen={},out=[];
-  [s.clSite].concat(String(s.clExtra||"").split(/[,;\s]+/)).forEach(function(x){x=slug(x,"");if(x&&!seen[x]){seen[x]=1;out.push(x)}});
-  if(!out.length)out.push("pittsburgh");return out}
-
-/* Cars.com uses make slugs like "land_rover" and model slugs like "ford-f_150". */
-function carsSlug(s){return String(s).toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"")}
-function carsUrl(c,vehicle){
-  var p=new URLSearchParams();var mm=splitVehicle(vehicle);
-  p.set("stock_type","used");
-  if(mm.make){var mk=carsSlug(mm.make);p.append("makes[]",mk);if(mm.model)p.append("models[]",mk+"-"+carsSlug(mm.model))}
-  if(c.yearMin)p.set("year_min",c.yearMin);if(c.yearMax)p.set("year_max",c.yearMax);
-  if(c.priceMax)p.set("list_price_max",c.priceMax);
-  if(c.milesMax)p.set("mileage_max",c.milesMax);
-  if(/^\d{5}$/.test(c.zip)){p.set("zip",c.zip);
-    var d=c.dist==="any"?500:(Number(c.dist)||50),allowed=[10,25,50,75,100,200,500];p.set("maximum_distance",String(allowed.filter(function(x){return x>=d})[0]||500))}
-  p.set("sort","listed_at_desc");
-  return "https://www.cars.com/shopping/results/?"+p.toString();
-}
-function offerupUrl(c,vehicle){
-  var p=new URLSearchParams();
-  var q=[vehicle,c.engine,c.kw].filter(Boolean).join(" ");
-  p.set("q",q||"car truck");
-  if(c.priceMin)p.set("PRICE_MIN",c.priceMin);
-  if(c.priceMax)p.set("PRICE_MAX",c.priceMax);
-  return "https://offerup.com/search?"+p.toString();
-}
 
 /* ---------- listings ---------- */
 var SITES=[["cars.com","Cars.com"],["autotrader.com","Autotrader"],["cargurus.com","CarGurus"],["carmax.com","CarMax"],["carvana.com","Carvana"],["truecar.com","TrueCar"],["edmunds.com","Edmunds"],["ebay.com","eBay Motors"],["carsandbids.com","Cars & Bids"],["bringatrailer.com","Bring a Trailer"],["hemmings.com","Hemmings"],["autotempest.com","AutoTempest"],["facebook.com","Facebook"],["craigslist.org","Craigslist"],["offerup.com","OfferUp"],["copart.com","Copart"],["iaai.com","IAA"],["acvauctions.com","ACV"],["kbb.com","Kelley Blue Book"],["carfax.com","Carfax"],["cargurus.ca","CarGurus"],["privateauto.com","PrivateAuto"],["carsoup.com","CarSoup"],["carsdirect.com","CarsDirect"],["vroom.com","Vroom"]];
@@ -265,8 +175,7 @@ function mergePlan(state,backup){
   return {searches:searches,finds:finds,skipped:(backup.searches.length-searches.length)+(backup.finds.length-finds.length)}}
 
 return {FIELDS:FIELDS,LABELS:LABELS,STAGES:STAGES,money:money,num:num,slug:slug,safeUrl:safeUrl,vtext:vtext,vlist:vlist,splitVehicle:splitVehicle,
-  title:title,chipList:chipList,criteriaKey:criteriaKey,sameCriteria:sameCriteria,skippedFilters:skippedFilters,
-  fbUrl:fbUrl,fbLinks:fbLinks,atUrl:atUrl,clUrl:clUrl,clSites:clSites,carsUrl:carsUrl,offerupUrl:offerupUrl,
+  title:title,chipList:chipList,criteriaKey:criteriaKey,sameCriteria:sameCriteria,migrateCriteria:migrateCriteria,
   siteOf:siteOf,guessTitle:guessTitle,detectTitle:detectTitle,normUrl:normUrl,findByUrl:findByUrl,cpm:cpm,budgetGap:budgetGap,
   withPrice:withPrice,priceChange:priceChange,cleanVin:cleanVin,checkVin:checkVin,findVin:findVin,parseVpic:parseVpic,parseRecalls:parseRecalls,
   vpicUrl:vpicUrl,recallsUrl:recallsUrl,vinRecallPage:vinRecallPage,makeBackup:makeBackup,readBackup:readBackup,mergePlan:mergePlan};

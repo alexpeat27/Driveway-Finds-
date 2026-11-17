@@ -18,72 +18,12 @@ test("splitVehicle handles two-word makes and nicknames", () => {
   assert.deepEqual(DF.splitVehicle(""), { make: "", model: "" });
 });
 
-test("AutoTempest link no longer splits Land Rover into make 'land'", () => {
-  const p = q(DF.atUrl(crit({ zip: "15222" }), "Land Rover Defender"));
-  assert.equal(p.get("make"), "landrover");
-  assert.equal(p.get("model"), "defender");
-  const t = q(DF.atUrl(crit({}), "Ford F-150"));
-  assert.equal(t.get("make"), "ford");
-  assert.equal(t.get("model"), "f-150");
-  assert.equal(q(DF.atUrl(crit({ dist: "any" }), "Ford")).get("radius"), "any");
-  assert.equal(q(DF.atUrl(crit({ dist: "75" }), "Ford")).get("radius"), "100");
-});
-
-test("Craigslist link keeps every filter and caps distance at 500", () => {
-  const c = crit({ vehicles: "Toyota Tacoma, Ford F-150", body: "7", drive: "3", cyl: "5", fuel: "2", trans: "2", priceMax: "22000", zip: "15222", dist: "750" });
-  const u = DF.clUrl(c, S);
-  assert.match(u, /^https:\/\/pittsburgh\.craigslist\.org\/search\/cto\?/);
-  const p = q(u);
-  assert.equal(p.get("query"), "(Toyota Tacoma)|(Ford F-150)");
-  assert.equal(p.get("auto_bodytype"), "7");
-  assert.equal(p.get("search_distance"), "500");
-  assert.equal(p.get("postal"), "15222");
-  assert.match(DF.clUrl(c, S, "morgantown"), /^https:\/\/morgantown\.craigslist\.org\//);
-});
-
-test("clSites lists the main site first, then nearby ones without repeats", () => {
-  assert.deepEqual(DF.clSites({ clSite: "pittsburgh", clExtra: "Morgantown, wheeling, pittsburgh" }), ["pittsburgh", "morgantown", "wheeling"]);
-  assert.deepEqual(DF.clSites({}), ["pittsburgh"]);
-});
-
-test("Facebook link turns 4x4 and diesel into words", () => {
-  const p = q(DF.fbUrl(crit({ drive: "3", fuel: "2", priceMax: "9000" }), S, "Ford F-250"));
-  assert.equal(p.get("query"), "Ford F-250 4x4 diesel");
-  assert.equal(p.get("maxPrice"), "9000");
-  assert.equal(p.get("sellerType"), "individual");
-});
-
-test("Cars.com link uses its make and model slugs", () => {
-  const p = q(DF.carsUrl(crit({ zip: "15222", dist: "150", priceMax: "30000", yearMin: "2015" }), "Ford F-150"));
-  assert.deepEqual(p.getAll("makes[]"), ["ford"]);
-  assert.deepEqual(p.getAll("models[]"), ["ford-f_150"]);
-  assert.equal(p.get("maximum_distance"), "200");
-  assert.equal(p.get("list_price_max"), "30000");
-  assert.equal(p.get("stock_type"), "used");
-  assert.deepEqual(q(DF.carsUrl(crit({}), "Land Rover Defender")).getAll("models[]"), ["land_rover-defender"]);
-  assert.equal(q(DF.carsUrl(crit({}), "Toyota")).getAll("models[]").length, 0);
-});
-
-test("OfferUp link carries the vehicle and price", () => {
-  const p = q(DF.offerupUrl(crit({ priceMax: "8000", kw: "plow" }), "Ford F-250"));
-  assert.equal(p.get("q"), "Ford F-250 plow");
-  assert.equal(p.get("PRICE_MAX"), "8000");
-});
-
-test("skippedFilters names the filters a site cannot use", () => {
-  const c = crit({ body: "7", drive: "3", cyl: "5", trans: "2", priceMax: "1", zip: "15222" });
-  assert.deepEqual(DF.skippedFilters("facebook", c), ["body style", "cylinders", "transmission", "ZIP and distance"]);
-  assert.deepEqual(DF.skippedFilters("craigslist", c), []);
-  assert.deepEqual(DF.skippedFilters("facebook", crit({ drive: "1" })), ["drive"]);
-  assert.deepEqual(DF.skippedFilters("autotempest", crit({ zip: "15222", dist: "any" })), []);
-});
-
 test("sameCriteria ignores case, spacing and vehicle order", () => {
   const a = crit({ vehicles: "Toyota Tacoma, Ford F-150", priceMax: "20000" });
   const b = crit({ vehicles: "ford  f-150,toyota tacoma ", priceMax: "20000" });
   assert.ok(DF.sameCriteria(a, b));
   assert.ok(!DF.sameCriteria(a, crit({ vehicles: "Toyota Tacoma", priceMax: "20000" })));
-  assert.ok(DF.sameCriteria(crit({}), Object.assign(blank(), { dist: "" })));
+  assert.ok(DF.sameCriteria(crit({ dist: "any" }), Object.assign(blank(), { dist: "" })));
 });
 
 test("normUrl spots the same listing pasted twice", () => {
@@ -100,6 +40,18 @@ test("normUrl spots the same listing pasted twice", () => {
   const finds = [{ id: "a", url: "https://pittsburgh.craigslist.org/cto/d/x/7712.html" }];
   assert.equal(DF.findByUrl(finds, "https://pittsburgh.craigslist.org/cto/d/x/7712.html?lang=en"), null);
   assert.equal(DF.findByUrl(finds, "https://pittsburgh.craigslist.org/cto/d/x/7712.html/").id, "a");
+});
+
+test("old saved searches are translated, new ones are left alone", () => {
+  const old = DF.migrateCriteria({ vehicles: "Ford F-250", body: "7", drive: "3", cyl: "4", fuel: "2", trans: "1", kw: "plow", dist: "75" });
+  assert.deepEqual([old.body, old.drive, old.cyl, old.fuel, old.trans, old.dist, old.kw, old.fmt], ["pickup", "4wd", "6", "diesel", "manual", "100", undefined, 2]);
+  const now = DF.migrateCriteria({ fmt: 2, cyl: "4", body: "suv", drive: "awd" });
+  assert.deepEqual([now.cyl, now.body, now.drive], ["4", "suv", "awd"]);
+  assert.equal(DF.migrateCriteria({ fmt: 2, body: "7" }).body, "", "an unknown value is dropped");
+  assert.equal(DF.migrateCriteria({ body: "6" }).body, "", "old Off-road has no equivalent");
+  assert.ok(DF.sameCriteria({ vehicles: "Ford", drive: "3" }, { fmt: 2, vehicles: "ford", drive: "4wd" }));
+  assert.deepEqual(DF.chipList({ fmt: 2, vehicles: "Ford", body: "pickup", drive: "4wd", cyl: "8", dist: "any" }), ["Pickup", "4x4", "8 cyl", "Anywhere in the US"]);
+  assert.equal(DF.title({ fmt: 2, body: "minivan" }), "Any Minivan");
 });
 
 test("price history records only real changes", () => {

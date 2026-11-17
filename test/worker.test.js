@@ -154,6 +154,44 @@ test("Anywhere in the US sends no ZIP, so services search nationwide", async () 
   assert.equal(ad.get("distance"), "250");
 });
 
+test("vehicle filters go to Auto.dev and every result is re-checked", async () => {
+  mock({ "api.auto.dev": () => reply({ data: [
+    { vin: "1M8GDM9AXKP042788", vehicle: { year: 2015, make: "Toyota", model: "Tacoma", drivetrain: "4WD", transmission: "Manual", fuel: "Gasoline", cylinders: 6, bodyStyle: "Truck", engine: "4.0L 6Cyl regular unleaded" },
+      retailListing: { price: 20000, miles: 90000, vdp: "https://d.example/keep", primaryImage: "https://img.example/1.jpg" } },
+    { vin: "", vehicle: { year: 2015, make: "Toyota", model: "Tacoma", drivetrain: "RWD", transmission: "Manual", bodyStyle: "Truck" },
+      retailListing: { price: 20000, miles: 90000, vdp: "https://d.example/wrong-drive", primaryImage: "https://img.example/2.jpg" } },
+    { vin: "", vehicle: { year: 2015, make: "Toyota", model: "Tacoma", drivetrain: "4WD", transmission: "Automatic" },
+      retailListing: { price: 20000, miles: 90000, vdp: "https://d.example/wrong-trans", primaryImage: "https://img.example/3.jpg" } },
+    { vin: "", vehicle: { year: 2015, make: "Toyota", model: "Tacoma" },
+      retailListing: { price: 20000, miles: 90000, vdp: "https://d.example/unstated", primaryImage: "https://img.example/4.jpg" } },
+    { vin: "", vehicle: { year: 2015, make: "Toyota", model: "Tacoma", drivetrain: "4WD", transmission: "Manual", engine: "2.7L 4Cyl", cylinders: 4 },
+      retailListing: { price: 20000, miles: 90000, vdp: "https://d.example/wrong-engine", primaryImage: "https://img.example/5.jpg" } },
+  ] }) });
+  const body = await (await W.default.fetch(req("vehicles=Toyota+Tacoma&body=pickup&drive=4wd&trans=manual&engine=4.0&dist=any"), { ACCESS_CODE: "open sesame", AUTODEV_KEY: "ak" })).json();
+  const p = new URL(calls.find((c) => c.url.includes("api.auto.dev")).url).searchParams;
+  assert.equal(p.get("vehicle.bodyStyle"), "Truck,Pickup");
+  assert.equal(p.get("vehicle.drivetrain"), "4WD");
+  assert.equal(p.get("vehicle.transmission"), "Manual");
+  assert.deepEqual(body.results.map((x) => x.url).sort(), ["https://d.example/keep", "https://d.example/unstated"]);
+  const kept = body.results.find((x) => x.url === "https://d.example/keep");
+  assert.deepEqual([kept.drive, kept.trans, kept.fuel, kept.cyl, kept.body], ["4wd", "manual", "gas", 6, "pickup"]);
+});
+
+test("a body style alone is a valid search; junk filter values are ignored", async () => {
+  mock();
+  let r = await W.default.fetch(req("body=pickup&fuel=diesel"), ENV);
+  assert.equal(r.status, 200);
+  const ad = new URL(calls.find((c) => c.url.includes("api.auto.dev")).url).searchParams;
+  assert.equal(ad.get("vehicle.make"), null);
+  assert.equal(ad.get("vehicle.fuel"), "Diesel");
+  const eb = new URL(calls.find((c) => c.url.includes("item_summary")).url).searchParams;
+  assert.equal(eb.get("q"), "pickup truck diesel");
+  const c = W.readCriteria(new URLSearchParams("vehicles=Ford&body=7&drive=sideways&cyl=5&fuel=<script>"));
+  assert.deepEqual([c.body, c.drive, c.cyl, c.fuel], ["", "", "", ""]);
+  r = await W.default.fetch(req("body=spaceship"), ENV);
+  assert.equal(r.status, 400);
+});
+
 test("no vehicle is a clear error", async () => {
   mock();
   const r = await W.default.fetch(req("vehicles="), ENV);

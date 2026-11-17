@@ -31,7 +31,7 @@ export default {
     if (!sameSecret(request.headers.get("X-Access-Code") || "", env.ACCESS_CODE)) return json({ error: "wrong_access_code" }, 401, cors);
 
     const c = readCriteria(url.searchParams);
-    if (!c.vehicles.length) return json({ error: "no_vehicle", message: "Enter at least one make or model." }, 400, cors);
+    if (!c.vehicles.length && !c.body) return json({ error: "no_vehicle", message: "Enter a make or model, or pick a body style." }, 400, cors);
 
     const cacheKey = new Request("https://cache.driveway-finds/search?" + canonicalQuery(c));
     const cache = typeof caches !== "undefined" ? caches.default : null;
@@ -97,11 +97,32 @@ export function readCriteria(p) {
     priceMin: int(p.get("priceMin"), 0, 10000000), priceMax: int(p.get("priceMax"), 0, 10000000),
     milesMax: int(p.get("milesMax"), 0, 2000000), zip, dist,
     keywords: String(p.get("kw") || "").slice(0, 80),
+    body: pick(p.get("body"), BODY_AUTODEV), drive: pick(p.get("drive"), DRIVE_AUTODEV),
+    fuel: pick(p.get("fuel"), FUEL_AUTODEV), trans: pick(p.get("trans"), { automatic: 1, manual: 1 }),
+    cyl: pick(p.get("cyl"), { 4: 1, 6: 1, 8: 1, 10: 1 }),
+    engine: String(p.get("engine") || "").replace(/[^\w\s.-]/g, "").trim().slice(0, 30),
   };
 }
 function canonicalQuery(c) {
-  return JSON.stringify([c.vehicles.map((v) => v.toLowerCase()).sort(), c.yearMin, c.yearMax, c.priceMin, c.priceMax, c.milesMax, c.zip, c.dist, c.keywords.toLowerCase()]);
+  return JSON.stringify([c.vehicles.map((v) => v.toLowerCase()).sort(), c.yearMin, c.yearMax, c.priceMin, c.priceMax, c.milesMax, c.zip, c.dist, c.keywords.toLowerCase(),
+    c.body, c.drive, c.fuel, c.trans, c.cyl, c.engine.toLowerCase()]);
 }
+function pick(v, allowed) { v = String(v || "").toLowerCase(); return Object.prototype.hasOwnProperty.call(allowed, v) ? v : ""; }
+
+/* ---------- vehicle filters ----------
+   Auto.dev's labels, checked against its live data: pickups are "Truck" (sometimes "Pickup"), and most
+   sedans, coupes, hatchbacks, wagons and convertibles are just "Car", so those include cars generally. */
+const BODY_AUTODEV = { pickup: "Truck,Pickup", suv: "SUV", sedan: "Car,Sedan", coupe: "Car,Coupe", hatchback: "Car,Hatchback", wagon: "Car,Wagon", convertible: "Car,Convertible", van: "Van", minivan: "Minivan" };
+const DRIVE_AUTODEV = { "4wd": "4WD", awd: "AWD", rwd: "RWD", fwd: "FWD" };
+const FUEL_AUTODEV = { gas: "Gasoline,Flex-fuel", diesel: "Diesel", hybrid: "Hybrid,Plug-in Hybrid", electric: "Electric" };
+const BODY_LABEL = { pickup: "pickup truck", suv: "SUV", sedan: "sedan", coupe: "coupe", hatchback: "hatchback", wagon: "wagon", convertible: "convertible", van: "van", minivan: "minivan" };
+/* Turn a source's free-text value into this app's words, or "" when unknown. */
+function driveWord(t) { t = String(t || "").toLowerCase(); return /4wd|4x4|four.?wheel/.test(t) ? "4wd" : /awd|all.?wheel/.test(t) ? "awd" : /rwd|rear/.test(t) ? "rwd" : /fwd|front/.test(t) ? "fwd" : ""; }
+function fuelWord(t) { t = String(t || "").toLowerCase(); return /plug|hybrid/.test(t) ? "hybrid" : /electric|\bev\b/.test(t) ? "electric" : /diesel/.test(t) ? "diesel" : /gas|flex|unleaded|petrol/.test(t) ? "gas" : ""; }
+function transWord(t) { t = String(t || "").toLowerCase(); return /manual|stick|\bmt\b/.test(t) ? "manual" : /auto|cvt|\bat\b|direct drive/.test(t) ? "automatic" : ""; }
+function bodyWord(t) { t = String(t || "").toLowerCase();
+  return /minivan/.test(t) ? "minivan" : /\bvan\b/.test(t) ? "van" : /pickup|truck|\bcab\b|crew|chassis/.test(t) ? "pickup" : /suv|sport utility|utility/.test(t) ? "suv" :
+    /convertible|cabrio|roadster/.test(t) ? "convertible" : /wagon/.test(t) ? "wagon" : /hatch/.test(t) ? "hatchback" : /coupe/.test(t) ? "coupe" : /sedan/.test(t) ? "sedan" : /\bcar\b/.test(t) ? "car" : ""; }
 
 /* ---------- makes ---------- */
 const MULTI_MAKES = ["land rover", "alfa romeo", "aston martin", "mercedes benz", "rolls royce", "am general"];
@@ -143,7 +164,7 @@ async function getJson(url, init) {
 
 export async function searchAll(c, env) {
   const jobs = [];
-  for (const v of c.vehicles) {
+  for (const v of c.vehicles.length ? c.vehicles : [""]) {
     const mm = splitVehicle(v);
     if (env.MARKETCHECK_KEY) {
       jobs.push(timed("MarketCheck", () => marketcheck(c, mm, env, "dealer")));
@@ -194,6 +215,14 @@ export function fits(l, c) {
   if (c.priceMax && l.price && l.price > c.priceMax) return false;
   if (c.priceMin && l.price && l.price < c.priceMin) return false;
   if (c.milesMax && l.miles != null && l.miles > c.milesMax) return false;
+  // Spec filters only drop a listing that states a different value; one that doesn't say is kept.
+  if (c.drive && l.drive && l.drive !== c.drive) return false;
+  if (c.fuel && l.fuel && l.fuel !== c.fuel) return false;
+  if (c.trans && l.trans && l.trans !== c.trans) return false;
+  if (c.cyl && l.cyl && Number(c.cyl) !== l.cyl) return false;
+  if (c.body && l.body && l.body !== "car" && l.body !== c.body) return false;
+  if (c.body && l.body === "car" && !["sedan", "coupe", "hatchback", "wagon", "convertible"].includes(c.body)) return false;
+  if (c.engine) { const hay = (l.engine + " " + l.title).toLowerCase(); if (l.engine && !hay.includes(c.engine.toLowerCase())) return false; }
   return true;
 }
 
@@ -211,6 +240,8 @@ function listing(o) {
     vin: cleanVin(o.vin), url: httpUrl(o.url), photo: httpUrl(o.photo), photoCount: num(o.photoCount) || (o.photo ? 1 : 0),
     location: [o.city, o.state].filter(Boolean).join(", "), distance: num(o.distance),
     seller: String(o.seller || "").slice(0, 80), listedAt: time(o.listedAt),
+    body: bodyWord(o.body), drive: driveWord(o.drive), fuel: fuelWord(o.fuel), trans: transWord(o.trans),
+    cyl: num(o.cyl) || null, engine: String(o.engine || "").slice(0, 60),
   };
 }
 
@@ -238,6 +269,7 @@ async function marketcheck(c, mm, env, kind) {
       price: x.price, miles: x.miles, vin: x.vin, url: x.vdp_url || x.source_url || x.url, photo: photos[0], photoCount: photos.length,
       city: d.city || x.city, state: d.state || x.state, distance: x.dist, seller: d.name || x.seller_name,
       listedAt: x.first_seen_at || x.first_seen_at_date || x.scraped_at,
+      body: b.body_type, drive: b.drivetrain, fuel: b.fuel_type, trans: b.transmission, cyl: b.cylinders, engine: b.engine,
     });
   });
 }
@@ -252,6 +284,11 @@ async function autodev(c, mm, env) {
   if (c.yearMin || c.yearMax) p.set("vehicle.year", (c.yearMin || 1950) + "-" + (c.yearMax || 2035));
   if (c.priceMin || c.priceMax) p.set("retailListing.price", (c.priceMin || 1) + "-" + (c.priceMax || 10000000));
   if (c.milesMax) p.set("retailListing.miles", "0-" + c.milesMax);
+  if (c.body) p.set("vehicle.bodyStyle", BODY_AUTODEV[c.body]);
+  if (c.drive) p.set("vehicle.drivetrain", DRIVE_AUTODEV[c.drive]);
+  if (c.fuel) p.set("vehicle.fuel", FUEL_AUTODEV[c.fuel]);
+  if (c.trans) p.set("vehicle.transmission", c.trans === "manual" ? "Manual" : "Automatic");
+  if (c.cyl) p.set("vehicle.cylinders", c.cyl);
   // Auto.dev reads a ZIP without a distance as "this ZIP only", so "Anywhere in the US" sends neither.
   if (c.zip && c.dist) { p.set("zip", c.zip); p.set("distance", String(c.dist)); }
   const j = await getJson("https://api.auto.dev/listings?" + p.toString(), { headers: { Authorization: "Bearer " + env.AUTODEV_KEY } });
@@ -265,6 +302,7 @@ async function autodev(c, mm, env) {
       vin: x.vin || v.vin, url: r.vdp || r.vdpUrl || x.vdpUrl || x.clickoffUrl, photo: r.primaryImage || x.primaryPhotoUrl || (x.photoUrls || [])[0],
       photoCount: r.photoCount || (x.photoUrls || []).length, city: r.city || x.city, state: r.state || x.state,
       distance: x.distanceFromOrigin || x.distance, seller: r.dealer || x.dealerName, listedAt: x.createdAt || x.created_at,
+      body: v.bodyStyle, drive: v.drivetrain, fuel: v.fuel, trans: v.transmission, cyl: v.cylinders, engine: v.engine,
     });
   });
 }
@@ -285,7 +323,7 @@ async function ebayAuth(env) {
 }
 async function ebay(c, vehicle, env) {
   const token = await ebayAuth(env);
-  const q = [vehicle, c.keywords].filter(Boolean).join(" ");
+  const q = [vehicle || BODY_LABEL[c.body] || "", c.drive === "4wd" ? "4x4" : "", c.fuel === "diesel" ? "diesel" : "", c.engine, c.keywords].filter(Boolean).join(" ");
   const p = new URLSearchParams({ q, category_ids: "6001", limit: String(MAX_PER_SOURCE), sort: "newlyListed" });
   const f = ["buyingOptions:{FIXED_PRICE|BEST_OFFER|AUCTION}", "deliveryCountry:US"];
   if (c.priceMin || c.priceMax) f.push("price:[" + (c.priceMin || 0) + ".." + (c.priceMax || "") + "]", "priceCurrency:USD");

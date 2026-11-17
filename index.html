@@ -58,7 +58,7 @@ legend{font-family:var(--display);font-size:16px;font-weight:600;text-transform:
 label.f.wide{grid-column:1/-1}
 label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:500;color:var(--muted)}
 input,select,button{font:inherit}
-input[type=text],input[type=number],input[type=url],select{width:100%;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:9px 10px;font-size:15px;min-height:40px}
+input[type=text],input[type=number],input[type=url],input[type=password],select{width:100%;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:9px 10px;font-size:15px;min-height:40px}
 input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible{outline:3px solid var(--flag);outline-offset:2px}
 .pair{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--ink);background:var(--surface);color:var(--ink);border-radius:8px;padding:10px 14px;font-weight:600;font-size:15px;cursor:pointer;text-decoration:none;min-height:42px}
@@ -112,8 +112,6 @@ ol.steps b{color:var(--ink)}
 .vinrow{display:grid;grid-template-columns:1fr auto;gap:8px}
 details.more summary{cursor:pointer;font-weight:600;font-size:14px;padding:6px 0}
 details.more .stack{margin-top:8px}
-.skipped{font-size:13px;color:var(--warn);background:var(--warn-bg);border-radius:7px;padding:8px 12px;margin:12px 0 0}
-.skipped b{font-weight:600}
 .edit{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;background:var(--sunk);border-radius:8px;padding:12px}
 .edit .wide{grid-column:1/-1}
 .edit textarea{width:100%;min-height:64px;font:inherit;font-size:15px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:8px 10px}
@@ -159,37 +157,36 @@ details.more .stack{margin-top:8px}
     <div class="bench">
       <form class="card" id="f" autocomplete="off">
         <h2>Build a search</h2>
-        <p class="sub">Fill in what matters and leave the rest blank. The example below is a starting point, change anything.</p>
+        <p class="sub">Fill in what matters and leave the rest blank, then press Search.</p>
         <fieldset>
           <legend>Vehicle</legend>
           <div class="grid">
             <label class="f wide">Makes and models, separated by commas<input type="text" id="vehicles" placeholder="Toyota Tacoma, Ford F-150, Chevrolet"></label>
             <label class="f">Year
-              <span class="pair"><input type="number" id="yearMin" placeholder="From" min="1950" max="2030" aria-label="Year from"><input type="number" id="yearMax" placeholder="To" min="1950" max="2030" aria-label="Year to"></span>
+              <span class="pair"><input type="number" id="yearMin" placeholder="From" min="1950" max="2035" aria-label="Year from"><input type="number" id="yearMax" placeholder="To" min="1950" max="2035" aria-label="Year to"></span>
             </label>
             <label class="f">Body style
-              <select id="body"><option value="">Any</option><option value="7">Pickup</option><option value="10">SUV</option><option value="8">Sedan</option><option value="3">Coupe</option><option value="4">Hatchback</option><option value="11">Wagon</option><option value="12">Van</option><option value="5">Minivan</option><option value="2">Convertible</option><option value="6">Off-road</option></select>
+              <select id="body"><option value="">Any</option><option value="pickup">Pickup</option><option value="suv">SUV</option><option value="sedan">Sedan</option><option value="coupe">Coupe</option><option value="hatchback">Hatchback</option><option value="wagon">Wagon</option><option value="convertible">Convertible</option><option value="van">Van</option><option value="minivan">Minivan</option></select>
             </label>
           </div>
-          <p class="note">A make alone works too. Add as many as you like.</p>
+          <p class="note">A make alone works too, and so does a body style with no make. Up to 5 makes or models.</p>
         </fieldset>
         <fieldset>
           <legend>Drivetrain and engine</legend>
           <div class="grid">
             <label class="f">Drive
-              <select id="drive"><option value="">Any</option><option value="3">4x4 / 4WD</option><option value="2">Rear-wheel</option><option value="1">Front-wheel</option></select>
+              <select id="drive"><option value="">Any</option><option value="4wd">4x4 / 4WD</option><option value="awd">All-wheel</option><option value="rwd">Rear-wheel</option><option value="fwd">Front-wheel</option></select>
             </label>
             <label class="f">Cylinders
-              <select id="cyl"><option value="">Any</option><option value="2">4 cyl</option><option value="4">6 cyl</option><option value="5">8 cyl</option><option value="6">10 cyl</option></select>
+              <select id="cyl"><option value="">Any</option><option value="4">4 cyl</option><option value="6">6 cyl</option><option value="8">8 cyl</option><option value="10">10 cyl</option></select>
             </label>
-            <label class="f">Engine size or name<input type="text" id="engine" placeholder="5.3, 6.7 Cummins"></label>
+            <label class="f">Engine size or name<input type="text" id="engine" placeholder="5.3, 6.7, 2.7L"></label>
             <label class="f">Fuel
-              <select id="fuel"><option value="">Any</option><option value="1">Gas</option><option value="2">Diesel</option><option value="3">Hybrid</option><option value="4">Electric</option></select>
+              <select id="fuel"><option value="">Any</option><option value="gas">Gas</option><option value="diesel">Diesel</option><option value="hybrid">Hybrid</option><option value="electric">Electric</option></select>
             </label>
             <label class="f">Transmission
-              <select id="trans"><option value="">Any</option><option value="2">Automatic</option><option value="1">Manual</option></select>
+              <select id="trans"><option value="">Any</option><option value="automatic">Automatic</option><option value="manual">Manual</option></select>
             </label>
-            <label class="f">Extra keywords<input type="text" id="kw" placeholder="crew cab, plow, one owner"></label>
           </div>
         </fieldset>
         <fieldset>
@@ -201,7 +198,7 @@ details.more .stack{margin-top:8px}
             <label class="f">Max mileage<input type="number" id="milesMax" placeholder="100000" min="0" step="5000"></label>
             <label class="f">ZIP code<input type="text" id="zip" inputmode="numeric" maxlength="5" placeholder="15222"></label>
             <label class="f">Distance
-              <select id="dist"><option value="10">10 miles</option><option value="15">15 miles</option><option value="25">25 miles</option><option value="50">50 miles</option><option value="75">75 miles</option><option value="100">100 miles</option><option value="250">250 miles</option><option value="500">500 miles</option><option value="750">750 miles</option><option value="1000">1,000 miles</option><option value="any">Anywhere in the US</option></select>
+              <select id="dist"><option value="25">25 miles</option><option value="50">50 miles</option><option value="100">100 miles</option><option value="250">250 miles</option><option value="500">500 miles</option><option value="1000">1,000 miles</option><option value="any">Anywhere in the US</option></select>
             </label>
           </div>
         </fieldset>
@@ -215,18 +212,10 @@ details.more .stack{margin-top:8px}
         <div class="plate" id="plate">Any vehicle</div>
         <div class="chips" id="chips"></div>
         <div class="stack">
-          <button type="button" class="btn go big" id="search-all">Search everything, show results here</button>
-          <div class="stack" id="fb-links"></div>
-          <div class="stack" id="cl-links"></div>
-          <div class="stack" id="at-links"></div>
-          <details class="more">
-            <summary>More sites: Cars.com and OfferUp</summary>
-            <div class="stack" id="more-links"></div>
-          </details>
-          <button type="button" class="btn flag" id="flag">Flag this search to the Watchlist</button>
+          <button type="button" class="btn go big" id="search-all">Search</button>
+          <button type="button" class="btn flag" id="flag">Save this search to the Watchlist</button>
         </div>
-        <div class="skipped" id="skipped" hidden></div>
-        <p class="note">Each opens in a new tab with the newest listings first. Facebook and Craigslist show private sellers only. Facebook, AutoTempest, Cars.com and OfferUp search one vehicle at a time, so you get a button for each vehicle. Facebook uses the distance set on your Facebook location. Craigslist takes every filter and all your vehicles at once, but only covers one city's region and stops at 500 miles. Add nearby Craigslist sites on the Watchlist tab to cover more ground. AutoTempest pulls in Cars.com, Carvana, eBay Motors, TrueCar and others.</p>
+        <p class="note" id="search-note">Searches dealer and private-seller listings from every source connected to your search server, and shows them below with photos.</p>
       </aside>
     </div>
     <section class="results" id="results" hidden aria-live="polite">
@@ -246,45 +235,20 @@ details.more .stack{margin-top:8px}
         <div class="list" id="watch-list"></div>
       </div>
       <div class="stack">
-        <div class="card">
-          <h2>Email report</h2>
-          <p class="sub">New matches for flagged searches, sent to your Gmail.</p>
-          <label class="f">How often
-            <select id="digest"><option value="daily">Every day</option><option value="weekly">Once a week (Monday)</option><option value="off">Off, just fill the Finds tab</option></select>
-          </label>
-          <div class="status" id="run-status">No check has run yet.</div>
-          <p class="note" id="auto-note" hidden>Automatic checks are not set up for this copy of the page, so nothing will be added or emailed on its own. Add listings yourself on the Finds tab. Your data is saved in this browser only, so download a backup now and then.</p>
-        </div>
-        <div class="card">
-          <h2>Turn on alerts once</h2>
-          <p class="sub">The daily check reads alert emails that Facebook and Craigslist send you. Do this for each flagged search.</p>
-          <ol class="steps">
-            <li><b>Facebook:</b> open the search, choose Save search, then make sure Marketplace notifications include Email.</li>
-            <li><b>Craigslist:</b> open the search, choose Save search, and turn on the email alert for it.</li>
-            <li>Tick the boxes on the search here so you know which ones are set up.</li>
-          </ol>
-        </div>
-        <div class="card">
-          <h2>Your area</h2>
-          <div class="grid">
-            <label class="f">Facebook city<input type="text" id="fbCity" placeholder="pittsburgh"></label>
-            <label class="f">Craigslist site<input type="text" id="clSite" placeholder="pittsburgh"></label>
-          </div>
-          <p class="note">These are the city names that appear in each site's web address.</p>
-          <label class="f" style="margin-top:12px">Nearby Craigslist sites, separated by commas (optional)<input type="text" id="clExtra" placeholder="morgantown, wheeling, youngstown"></label>
-          <p class="note">Each one gets its own Craigslist button, so a long-distance search covers more than one city.</p>
-          <label class="f" style="margin-top:12px">Expected lifespan of a vehicle (miles)<input type="number" id="life" min="100000" max="500000" step="10000" placeholder="200000"></label>
-          <p class="note">Cost per remaining mile is price divided by lifespan minus the odometer. It needs a price and miles on the listing.</p>
-        </div>
         <div class="card" id="setup">
-          <h2>Search everything</h2>
-          <p class="sub">The Search everything button asks your own small search server, which checks MarketCheck, Auto.dev and eBay Motors at once. Paste its address and your access code here.</p>
+          <h2>Search server</h2>
+          <p class="sub">The Search button asks your own small search server, which checks every data source you've added a key for at once. Paste its address and your access code here.</p>
           <div class="stack">
             <label class="f">Search server address<input type="url" id="workerUrl" placeholder="https://driveway-finds.yourname.workers.dev" spellcheck="false"></label>
             <label class="f">Access code (saved on this device only)<input type="password" id="accessCode" autocomplete="off"></label>
             <div class="row"><button type="button" class="btn sm" id="test-worker">Test connection</button></div>
             <div class="note" id="worker-out" style="margin:0" aria-live="polite"></div>
           </div>
+        </div>
+        <div class="card">
+          <h2>Cost per mile</h2>
+          <label class="f">Expected lifespan of a vehicle (miles)<input type="number" id="life" min="100000" max="500000" step="10000" placeholder="200000"></label>
+          <p class="note">Cost per remaining mile is price divided by lifespan minus the odometer. It needs a price and miles on the listing.</p>
         </div>
         <div class="card">
           <h2>Backup</h2>
@@ -294,6 +258,7 @@ details.more .stack{margin-top:8px}
             <label class="btn sm" for="import">Restore from a file</label>
             <input type="file" id="import" accept="application/json,.json" class="visually-hidden">
           </div>
+          <p class="note" id="local-note" hidden>Your searches and finds are saved in this browser only. Download a backup now and then, and use the file to move them to another device.</p>
         </div>
       </div>
     </div>
@@ -347,8 +312,8 @@ details.more .stack{margin-top:8px}
 var $=function(id){return document.getElementById(id)};
 var DF=window.DF;
 var FIELDS=DF.FIELDS,LABELS=DF.LABELS,money=DF.money,num=DF.num,slug=DF.slug,safeUrl=DF.safeUrl,vlist=DF.vlist,title=DF.title,chipList=DF.chipList;
-var EXAMPLE={vehicles:"Toyota Tacoma",yearMin:"2012",yearMax:"2019",body:"7",drive:"3",cyl:"",engine:"",fuel:"",trans:"",kw:"",priceMin:"",priceMax:"22000",milesMax:"100000",zip:"15222",dist:"50"};
-var DEFAULT_SETTINGS={fbCity:"pittsburgh",clSite:"pittsburgh",clExtra:"",digest:"daily",lifespan:200000,workerUrl:""};
+var EXAMPLE={fmt:2,vehicles:"Toyota Tacoma",yearMin:"2012",yearMax:"2019",body:"pickup",drive:"4wd",cyl:"",engine:"",fuel:"",trans:"",priceMin:"",priceMax:"22000",milesMax:"100000",zip:"15222",dist:"any"};
+var DEFAULT_SETTINGS={lifespan:200000,workerUrl:""};
 
 var state={searches:[],finds:[],settings:Object.assign({},DEFAULT_SETTINGS),status:null,show:"active",editing:null,results:null};
 var db=null;
@@ -366,9 +331,10 @@ function confirmBtn(cls,text,armedText,fn){var b=el("button",cls,text);b.type="b
     b.textContent=armedText;b.classList.add("armed");t=setTimeout(function(){t=null;b.textContent=text;b.classList.remove("armed")},4000)});return b}
 function fmtDate(ms){return new Date(ms).toLocaleDateString("en-US",{month:"short",day:"numeric"})}
 
-function readForm(){var c={};FIELDS.forEach(function(k){c[k]=$(k).value.trim()});return c}
+function readForm(){var c={fmt:2};FIELDS.forEach(function(k){c[k]=$(k).value.trim()});return c}
 function fillForm(c){c=Object.assign({},c,{vehicles:DF.vtext(c)});FIELDS.forEach(function(k){if(c[k]!=null)$(k).value=c[k]});
   var d=$("dist");if(d.value===""){var n=Number(c.dist)||50,opts=Array.prototype.map.call(d.options,function(o){return Number(o.value)}).filter(function(x){return !isNaN(x)});d.value=String(opts.filter(function(x){return x>=n})[0]||1000)}}
+function loadSearch(c){fillForm(Object.assign({},blank(),DF.migrateCriteria(c)));saveDraft();renderLaunch()}
 function blank(){var b={};FIELDS.forEach(function(k){b[k]=""});b.dist="50";return b}
 
 /* The search form is remembered in this browser so a reload does not wipe it. */
@@ -404,23 +370,6 @@ function renderLaunch(){
   var list=chipList(c);
   if(!list.length)box.appendChild(el("span","chip","No filters yet"));
   list.forEach(function(t){box.appendChild(el("span","chip",t))});
-  var vs=vlist(c);if(!vs.length)vs=[""];
-  var fb=$("fb-links");fb.textContent="";
-  DF.fbLinks(c,s).forEach(function(l){fb.appendChild(link("btn go",l.label?"Facebook: "+l.label:"Open on Facebook Marketplace",l.url))});
-  var cl=$("cl-links");cl.textContent="";var sites=DF.clSites(s);
-  sites.forEach(function(site,i){cl.appendChild(link("btn go",sites.length>1?"Craigslist "+site+", by owner":"Open on Craigslist, by owner",DF.clUrl(c,s,site)))});
-  var at=$("at-links");at.textContent="";
-  vs.forEach(function(x){at.appendChild(link("btn",x?"Many sites at once: "+x:"Many sites at once (AutoTempest)",DF.atUrl(c,x)))});
-  var more=$("more-links");more.textContent="";
-  vs.forEach(function(x){more.appendChild(link("btn",x?"Cars.com: "+x:"Cars.com",DF.carsUrl(c,x)))});
-  vs.forEach(function(x){more.appendChild(link("btn",x?"OfferUp: "+x:"OfferUp",DF.offerupUrl(c,x)))});
-  /* Say which filters each site leaves out, so a surprising result has an explanation. */
-  var lines=[["Facebook","facebook"],["Craigslist","craigslist"],["AutoTempest","autotempest"],["Cars.com","carscom"],["OfferUp","offerup"]]
-    .map(function(p){var sk=DF.skippedFilters(p[1],c);return sk.length?[p[0],sk.join(", ")]:null}).filter(Boolean);
-  if(c.dist!=="any"&&Number(c.dist)>150&&sites.length<2)lines.push(["Craigslist","only the "+sites[0]+" region, add nearby sites on the Watchlist tab"]);
-  var sk=$("skipped");sk.textContent="";sk.hidden=!lines.length;
-  if(lines.length){sk.appendChild(document.createTextNode("Filters some sites can't apply. Check these by hand on the results page:"));
-    lines.forEach(function(l){var d=el("div");d.appendChild(el("b",null,l[0]+": "));d.appendChild(document.createTextNode(l[1]));sk.appendChild(d)})}
 }
 
 /* ---------- render: watchlist ---------- */
@@ -429,7 +378,7 @@ function renderWatch(){
   $("n-watch").textContent=state.searches.length;
   if(!state.searches.length){
     var e=el("div","empty");e.appendChild(el("strong",null,"Nothing flagged yet"));
-    e.appendChild(document.createTextNode("Build a search on the Search tab and choose Flag this search. Your flagged searches are kept here so you can rerun them."));
+    e.appendChild(document.createTextNode("Build a search on the Search tab and choose Save this search. Saved searches are kept here so you can run them again with one click."));
     box.appendChild(e);return}
   state.searches.slice().sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0)}).forEach(function(s){
     var c=s.criteria||{};
@@ -442,17 +391,12 @@ function renderWatch(){
     var right=el("div");right.appendChild(el("div","price",String(n)));right.appendChild(el("div","meta",n===1?"find":"finds"));
     right.style.textAlign="right";
     var act=el("div","actions");
-    DF.fbLinks(c,state.settings).forEach(function(l){act.appendChild(link("btn sm go",l.label?"Facebook: "+l.label:"Facebook",l.url))});
-    DF.clSites(state.settings).forEach(function(site,i){act.appendChild(link("btn sm go",i?"Craigslist "+site:"Craigslist",DF.clUrl(c,state.settings,site)))});
-    act.appendChild(btn("btn sm","Edit in Search",function(){fillForm(Object.assign({},blank(),c));saveDraft();renderLaunch();location.hash="search"}));
+    act.appendChild(btn("btn sm go","Run search",function(){loadSearch(c);location.hash="search";runSearchAll()}));
+    act.appendChild(btn("btn sm","Edit in Search",function(){loadSearch(c);location.hash="search"}));
     act.appendChild(confirmBtn("btn sm quiet","Remove",linked.length?"Click again: remove (its "+linked.length+" finds stay)":"Click again to remove",function(){
       /* Finds that belonged to this search are kept, just unlinked, so nothing points at a missing search. */
       var jobs=linked.map(function(f){return patchDoc("finds",f.id,{searchId:""})});
       Promise.all(jobs).then(function(){return dropDoc("searches",s.id)}).then(function(){toast("Removed from the Watchlist")})}));
-    ["fb","cl"].forEach(function(k){
-      var lab=el("label","check");var cb=document.createElement("input");cb.type="checkbox";cb.id="al-"+k+"-"+s.id;cb.checked=!!(s.alerts&&s.alerts[k]);
-      cb.addEventListener("change",function(){var al=Object.assign({fb:false,cl:false},s.alerts||{});al[k]=cb.checked;patchDoc("searches",s.id,{alerts:al})});
-      lab.appendChild(cb);lab.appendChild(document.createTextNode(k==="fb"?"Facebook alert on":"Craigslist alert on"));act.appendChild(lab)});
     it.appendChild(left);it.appendChild(right);it.appendChild(act);box.appendChild(it)});
 }
 
@@ -570,12 +514,9 @@ function renderSelects(){
     s.value=state.searches.some(function(x){return x.id===keep})?keep:""});
 }
 function renderSettings(){
-  ["fbCity","clSite","clExtra","workerUrl"].forEach(function(k){if(document.activeElement!==$(k))$(k).value=state.settings[k]||""});
-  $("digest").value=state.settings.digest||"daily";
+  if(document.activeElement!==$("workerUrl"))$("workerUrl").value=state.settings.workerUrl||"";
   if(document.activeElement!==$("life"))$("life").value=state.settings.lifespan||200000;
-  var st=state.status;
-  $("run-status").textContent=st&&st.lastRun?("Last check: "+new Date(st.lastRun).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})+(st.added!=null?", "+st.added+" new":"")+(st.note?". "+st.note:"")):"No check has run yet.";
-  $("auto-note").hidden=!!db;
+  $("local-note").hidden=!!db;
 }
 function renderAll(){renderLaunch();renderSelects();renderWatch();renderFinds();renderSettings()}
 
@@ -611,20 +552,17 @@ $("a-vin").addEventListener("input",function(){vinResult=null});
 
 /* ---------- events ---------- */
 $("f").addEventListener("input",function(){renderLaunch();saveDraft()});
-$("f").addEventListener("submit",function(e){e.preventDefault()});
+$("f").addEventListener("submit",function(e){e.preventDefault();runSearchAll()});
+$("f").addEventListener("keydown",function(e){if(e.key==="Enter"&&e.target.tagName==="INPUT"){e.preventDefault();runSearchAll()}});
 $("clear").addEventListener("click",function(){fillForm(blank());saveDraft();renderLaunch()});
 $("flag").addEventListener("click",function(){
   var c=readForm();
   var dup=state.searches.find(function(s){return DF.sameCriteria(s.criteria,c)});
-  if(dup){toast("That search is already on the Watchlist.");return}
+  if(dup){toast("That search is already saved on the Watchlist.");return}
   var name=title(c)+(c.yearMin||c.yearMax?" "+(c.yearMin||"")+"-"+(c.yearMax||""):"");
-  putDoc("searches",uid(),{name:name.trim(),criteria:c,alerts:{fb:false,cl:false},createdAt:Date.now()}).then(function(){toast("Flagged. It is on the Watchlist.")})});
+  putDoc("searches",uid(),{name:name.trim(),criteria:c,alerts:{fb:false,cl:false},createdAt:Date.now()}).then(function(){toast("Saved to the Watchlist.")})});
 $("life").addEventListener("change",function(){var v=Math.round(Number($("life").value));if(!(v>=100000&&v<=500000)){toast("Enter a lifespan between 100,000 and 500,000 miles");$("life").value=state.settings.lifespan||200000;return}
   state.settings.lifespan=v;saveSettings().then(function(){renderFinds();toast("Lifespan saved")})});
-$("digest").addEventListener("change",function(){state.settings.digest=$("digest").value;saveSettings().then(function(){toast("Report schedule saved")})});
-["fbCity","clSite"].forEach(function(k){$(k).addEventListener("change",function(){state.settings[k]=slug($(k).value,"pittsburgh");$(k).value=state.settings[k];saveSettings();renderLaunch();renderWatch()})});
-$("clExtra").addEventListener("change",function(){var seen={},list=$("clExtra").value.split(/[,;\s]+/).map(function(x){return slug(x,"")}).filter(function(x){if(!x||seen[x]||x===state.settings.clSite)return false;seen[x]=1;return true});
-  state.settings.clExtra=list.join(", ");$("clExtra").value=state.settings.clExtra;saveSettings();renderLaunch();renderWatch()});
 document.querySelectorAll(".seg button").forEach(function(b){b.addEventListener("click",function(){state.show=b.dataset.show;
   document.querySelectorAll(".seg button").forEach(function(x){x.setAttribute("aria-pressed",x===b?"true":"false")});renderFinds()})});
 $("find-search").addEventListener("change",renderFinds);
@@ -667,14 +605,14 @@ function callWorker(path,params){
     function(e){clearTimeout(t);throw new Error(e&&e.name==="AbortError"?"The search took too long. Try again.":"Couldn't reach your search server. Check its address.")})}
 function runSearchAll(){
   var c=readForm();
-  if(!vlist(c).length){toast("Enter at least one make or model first.");$("vehicles").focus();return}
-  if(!workerBase()){toast("Set up Search everything on the Watchlist tab first.");location.hash="watchlist";setTimeout(function(){$("workerUrl").focus()},50);return}
-  var p=new URLSearchParams();["vehicles","yearMin","yearMax","priceMin","priceMax","milesMax","zip","dist","kw"].forEach(function(k){if(c[k])p.set(k,c[k])});
+  if(!vlist(c).length&&!c.body){toast("Enter a make or model, or pick a body style.");$("vehicles").focus();return}
+  if(!workerBase()){toast("Connect your search server on the Watchlist tab first.");location.hash="watchlist";setTimeout(function(){$("workerUrl").focus()},50);return}
+  var p=new URLSearchParams();["vehicles","yearMin","yearMax","body","drive","cyl","engine","fuel","trans","priceMin","priceMax","milesMax","zip","dist"].forEach(function(k){if(c[k])p.set(k,c[k])});
   var b=$("search-all");b.disabled=true;b.textContent="Searching…";
   state.results={loading:true,title:title(c)};renderResults();
   callWorker("/search",p).then(function(j){state.results={title:title(c),list:j.results||[],sources:j.sources||[],enabled:j.enabled||[],cached:!!j.cached,at:j.at||Date.now()}},
     function(e){state.results={title:title(c),error:e.message}})
-  .then(function(){b.disabled=false;b.textContent="Search everything, show results here";renderResults();$("results").scrollIntoView({behavior:"smooth",block:"start"})})}
+  .then(function(){b.disabled=false;b.textContent="Search";renderResults();$("results").scrollIntoView({behavior:"smooth",block:"start"})})}
 function renderResults(){
   var r=state.results,sec=$("results");sec.hidden=!r;if(!r)return;
   var list=$("r-list"),st=$("r-status");list.textContent="";st.textContent="";
@@ -753,7 +691,7 @@ window.addEventListener("hashchange",route);
 
 /* ---------- start ---------- */
 fillStages($("a-stage"),"");try{$("accessCode").value=accessCode()}catch(e){}
-fillForm(Object.assign(blank(),loadDraft()||EXAMPLE));loadLocal();route();renderAll();
+fillForm(Object.assign(blank(),DF.migrateCriteria(loadDraft()||EXAMPLE)));loadLocal();route();renderAll();
 
 function rows(snap){return snap.docs.map(function(d){return Object.assign({id:d.id},d.data())})}
 function connect(){
