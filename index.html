@@ -119,6 +119,20 @@ details.more .stack{margin-top:8px}
 .edit textarea{width:100%;min-height:64px;font:inherit;font-size:15px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:8px 10px}
 .history{font-size:13px;color:var(--muted);margin:6px 0 0}
 .btn.armed{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.big{min-height:52px;font-size:17px}
+.results{margin-top:28px}
+.results h2{font-size:26px;text-transform:uppercase;margin-right:auto}
+.r-status{font-size:13px;color:var(--muted);margin:-4px 0 14px;display:flex;flex-wrap:wrap;gap:6px}
+.grid-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+.rc{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column}
+.rc .ph{aspect-ratio:4/3;background:var(--sunk);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;overflow:hidden}
+.rc .ph img{width:100%;height:100%;object-fit:cover;display:block}
+.rc .bd{padding:12px;display:flex;flex-direction:column;gap:6px;flex:1}
+.rc h3{font-size:19px;overflow-wrap:anywhere}
+.rc .price{font-size:24px}
+.rc .meta{margin:0}
+.rc .actions{margin-top:auto;padding-top:6px}
+.thumb{width:120px;aspect-ratio:4/3;object-fit:cover;border-radius:7px;background:var(--sunk);display:block;margin-bottom:8px}
 @media (max-width:820px){
   .bench,.cols{grid-template-columns:1fr}
   .launch{position:static}
@@ -201,6 +215,7 @@ details.more .stack{margin-top:8px}
         <div class="plate" id="plate">Any vehicle</div>
         <div class="chips" id="chips"></div>
         <div class="stack">
+          <button type="button" class="btn go big" id="search-all">Search everything, show results here</button>
           <div class="stack" id="fb-links"></div>
           <div class="stack" id="cl-links"></div>
           <div class="stack" id="at-links"></div>
@@ -214,6 +229,14 @@ details.more .stack{margin-top:8px}
         <p class="note">Each opens in a new tab with the newest listings first. Facebook and Craigslist show private sellers only. Facebook, AutoTempest, Cars.com and OfferUp search one vehicle at a time, so you get a button for each vehicle. Facebook uses the distance set on your Facebook location. Craigslist takes every filter and all your vehicles at once, but only covers one city's region and stops at 500 miles. Add nearby Craigslist sites on the Watchlist tab to cover more ground. AutoTempest pulls in Cars.com, Carvana, eBay Motors, TrueCar and others.</p>
       </aside>
     </div>
+    <section class="results" id="results" hidden aria-live="polite">
+      <div class="bar">
+        <h2 id="r-head">Results</h2>
+        <select id="r-sort" aria-label="Sort results"><option value="new">Newest first</option><option value="price">Lowest price</option><option value="miles">Lowest miles</option><option value="cpm">Lowest cost per remaining mile</option></select>
+      </div>
+      <div class="r-status" id="r-status"></div>
+      <div class="grid-cards" id="r-list"></div>
+    </section>
   </section>
 
   <!-- WATCHLIST -->
@@ -252,6 +275,16 @@ details.more .stack{margin-top:8px}
           <p class="note">Each one gets its own Craigslist button, so a long-distance search covers more than one city.</p>
           <label class="f" style="margin-top:12px">Expected lifespan of a vehicle (miles)<input type="number" id="life" min="100000" max="500000" step="10000" placeholder="200000"></label>
           <p class="note">Cost per remaining mile is price divided by lifespan minus the odometer. It needs a price and miles on the listing.</p>
+        </div>
+        <div class="card" id="setup">
+          <h2>Search everything</h2>
+          <p class="sub">The Search everything button asks your own small search server, which checks MarketCheck, Auto.dev and eBay Motors at once. Paste its address and your access code here.</p>
+          <div class="stack">
+            <label class="f">Search server address<input type="url" id="workerUrl" placeholder="https://driveway-finds.yourname.workers.dev" spellcheck="false"></label>
+            <label class="f">Access code (saved on this device only)<input type="password" id="accessCode" autocomplete="off"></label>
+            <div class="row"><button type="button" class="btn sm" id="test-worker">Test connection</button></div>
+            <div class="note" id="worker-out" style="margin:0" aria-live="polite"></div>
+          </div>
         </div>
         <div class="card">
           <h2>Backup</h2>
@@ -315,9 +348,9 @@ var $=function(id){return document.getElementById(id)};
 var DF=window.DF;
 var FIELDS=DF.FIELDS,LABELS=DF.LABELS,money=DF.money,num=DF.num,slug=DF.slug,safeUrl=DF.safeUrl,vlist=DF.vlist,title=DF.title,chipList=DF.chipList;
 var EXAMPLE={vehicles:"Toyota Tacoma",yearMin:"2012",yearMax:"2019",body:"7",drive:"3",cyl:"",engine:"",fuel:"",trans:"",kw:"",priceMin:"",priceMax:"22000",milesMax:"100000",zip:"15222",dist:"50"};
-var DEFAULT_SETTINGS={fbCity:"pittsburgh",clSite:"pittsburgh",clExtra:"",digest:"daily",lifespan:200000};
+var DEFAULT_SETTINGS={fbCity:"pittsburgh",clSite:"pittsburgh",clExtra:"",digest:"daily",lifespan:200000,workerUrl:""};
 
-var state={searches:[],finds:[],settings:Object.assign({},DEFAULT_SETTINGS),status:null,show:"active",editing:null};
+var state={searches:[],finds:[],settings:Object.assign({},DEFAULT_SETTINGS),status:null,show:"active",editing:null,results:null};
 var db=null;
 
 /* ---------- helpers ---------- */
@@ -455,7 +488,8 @@ function renderFinds(){
 function findCard(f){
   var ts=f.titleStatus||DF.detectTitle((f.title||"")+" "+(f.note||""));var branded=ts==="salvage"||ts==="rebuilt";
   var it=el("div","item"+(f.status==="saved"?" saved":"")+(branded?" branded":""));it.dataset.id=f.id;
-  var left=el("div");left.appendChild(el("h3",null,f.title||"Untitled listing"));
+  var left=el("div");var ph=safeUrl(f.photo);if(ph)left.appendChild(photo(ph,"thumb"));
+  left.appendChild(el("h3",null,f.title||"Untitled listing"));
   var bits=[];if(f.year)bits.push(String(f.year));if(num(f.miles)!=null)bits.push(Number(f.miles).toLocaleString("en-US")+" mi");if(f.location)bits.push(f.location);
   var s=state.searches.find(function(x){return x.id===f.searchId});if(s)bits.push("for "+(s.name||title(s.criteria||{})));
   if(f.foundAt)bits.push("found "+fmtDate(f.foundAt));
@@ -536,7 +570,7 @@ function renderSelects(){
     s.value=state.searches.some(function(x){return x.id===keep})?keep:""});
 }
 function renderSettings(){
-  ["fbCity","clSite","clExtra"].forEach(function(k){if(document.activeElement!==$(k))$(k).value=state.settings[k]||""});
+  ["fbCity","clSite","clExtra","workerUrl"].forEach(function(k){if(document.activeElement!==$(k))$(k).value=state.settings[k]||""});
   $("digest").value=state.settings.digest||"daily";
   if(document.activeElement!==$("life"))$("life").value=state.settings.lifespan||200000;
   var st=state.status;
@@ -611,6 +645,88 @@ $("add").addEventListener("submit",function(e){e.preventDefault();
     priceHistory:price!=null?[{price:price,at:now}]:[],status:"saved",foundAt:now})
   .then(function(){$("add").reset();vinResult=null;vinOut("Fills in the year, make, model and engine, and checks recalls, using free NHTSA data.");$("a-site").textContent="Works with links from any car site.";toast("Added to Finds")})});
 
+/* ---------- search everything ---------- */
+var ACCESS="driveway-finds-access";
+function accessCode(){try{return localStorage.getItem(ACCESS)||""}catch(e){return ""}}
+function photo(src,cls){var i=document.createElement("img");i.src=src;i.alt="";i.loading="lazy";i.decoding="async";i.referrerPolicy="no-referrer";if(cls)i.className=cls;
+  i.addEventListener("error",function(){i.remove()});return i}
+function workerBase(){var u=safeUrl(state.settings.workerUrl||"");return u&&/^https:/.test(u)?u.replace(/\/+$/,""):""}
+/* Calls the Worker. Resolves its JSON or rejects with a sentence a person can act on. */
+function callWorker(path,params){
+  var base=workerBase();if(!base)return Promise.reject(new Error("Set up your search server first, on the Watchlist tab."));
+  var ctl=typeof AbortController!=="undefined"?new AbortController():null;var t=setTimeout(function(){if(ctl)ctl.abort()},30000);
+  return fetch(base+path+(params?"?"+params.toString():""),{headers:{"X-Access-Code":accessCode()},signal:ctl?ctl.signal:undefined})
+    .then(function(r){clearTimeout(t);return r.json().catch(function(){return {}}).then(function(j){
+      if(r.ok)return j;
+      var why={wrong_access_code:"The access code doesn't match the one on your search server.",access_code_not_set:"Your search server has no ACCESS_CODE secret yet.",
+        origin_not_allowed:"Your search server doesn't allow this page's address. Add it to ALLOWED_ORIGINS.",no_vehicle:"Enter at least one make or model first."}[j.error];
+      throw new Error(why||j.message||("The search server answered with an error ("+r.status+")."))})},
+    function(e){clearTimeout(t);throw new Error(e&&e.name==="AbortError"?"The search took too long. Try again.":"Couldn't reach your search server. Check its address.")})}
+function runSearchAll(){
+  var c=readForm();
+  if(!vlist(c).length){toast("Enter at least one make or model first.");$("vehicles").focus();return}
+  if(!workerBase()){toast("Set up Search everything on the Watchlist tab first.");location.hash="watchlist";setTimeout(function(){$("workerUrl").focus()},50);return}
+  var p=new URLSearchParams();["vehicles","yearMin","yearMax","priceMin","priceMax","milesMax","zip","dist","kw"].forEach(function(k){if(c[k])p.set(k,c[k])});
+  var b=$("search-all");b.disabled=true;b.textContent="Searching…";
+  state.results={loading:true,title:title(c)};renderResults();
+  callWorker("/search",p).then(function(j){state.results={title:title(c),list:j.results||[],sources:j.sources||[],enabled:j.enabled||[],cached:!!j.cached,at:j.at||Date.now()}},
+    function(e){state.results={title:title(c),error:e.message}})
+  .then(function(){b.disabled=false;b.textContent="Search everything, show results here";renderResults();$("results").scrollIntoView({behavior:"smooth",block:"start"})})}
+function renderResults(){
+  var r=state.results,sec=$("results");sec.hidden=!r;if(!r)return;
+  var list=$("r-list"),st=$("r-status");list.textContent="";st.textContent="";
+  if(r.loading){$("r-head").textContent="Searching for "+r.title+"…";return}
+  if(r.error){$("r-head").textContent="Results";var e=el("div","empty");e.appendChild(el("strong",null,"Search didn't run"));e.appendChild(document.createTextNode(r.error));list.appendChild(e);return}
+  $("r-head").textContent=r.list.length+(r.list.length===1?" result":" results")+" for "+r.title;
+  if(!r.enabled.length)st.appendChild(el("span","pill warn","No sources have keys yet. Add them to your search server."));
+  r.sources.forEach(function(s){var p=el("span","pill "+(s.ok?"fb":"warn"),s.name+": "+(s.ok?s.count:"failed"));if(s.error)p.title=s.error;st.appendChild(p)});
+  if(r.cached)st.appendChild(el("span","pill fb","Saved copy from the last 15 minutes"));
+  r.sources.filter(function(s){return !s.ok}).forEach(function(s){var d=el("div","note",s.name+": "+s.error);d.style.flexBasis="100%";d.style.margin="0";st.appendChild(d)});
+  var sort=$("r-sort").value,rows=r.list.slice();
+  var key={price:function(x){return num(x.price)==null?1e12:num(x.price)},miles:function(x){return num(x.miles)==null?1e12:num(x.miles)},
+    cpm:function(x){var v=cpm(x);return v==null?1e12:v},new:function(x){return -(x.listedAt||0)}}[sort]||function(){return 0};
+  rows.sort(function(a,b){return key(a)-key(b)});
+  if(!rows.length){var e2=el("div","empty");e2.appendChild(el("strong",null,"Nothing matched"));e2.appendChild(document.createTextNode("Try a wider distance, a higher price, or fewer filters."));list.appendChild(e2);return}
+  rows.forEach(function(x){list.appendChild(resultCard(x))});
+}
+function resultCard(x){
+  var card=el("article","rc");var href=safeUrl(x.url);
+  var ph=el("div","ph");var src=safeUrl(x.photo);if(src)ph.appendChild(photo(src));else ph.textContent="No photo";card.appendChild(ph);
+  var bd=el("div","bd");
+  bd.appendChild(el("div","price",money(num(x.price))||"No price"));
+  bd.appendChild(el("h3",null,x.title||"Listing"));
+  var bits=[];if(num(x.miles)!=null)bits.push(Number(x.miles).toLocaleString("en-US")+" mi");if(x.location)bits.push(x.location);if(num(x.distance)!=null)bits.push(Math.round(x.distance)+" mi away");
+  if(bits.length)bd.appendChild(el("div","meta",bits.join("  ·  ")));
+  var pills=el("div","row");pills.appendChild(el("span","pill fb",x.source));
+  if(x.sellerType==="private")pills.appendChild(el("span","pill good","Private seller"));
+  if(x.listedAt&&Date.now()-x.listedAt<2*864e5)pills.appendChild(el("span","pill new","New"));
+  var ts=DF.detectTitle(x.title);if(ts)pills.appendChild(el("span","pill bad",ts==="salvage"?"Salvage title":"Rebuilt title"));
+  var cp=cpm(x);if(cp!=null)pills.appendChild(el("span","pill fb","$"+cp.toFixed(2)+"/remaining mi"));
+  bd.appendChild(pills);
+  var act=el("div","actions");
+  if(href)act.appendChild(link("btn sm go","Open listing",href));
+  (x.also||[]).forEach(function(a){var u=safeUrl(a.url);if(u)act.appendChild(link("btn sm","Also on "+a.source,u))});
+  var have=href?DF.findByUrl(state.finds,href):null;
+  var sv=btn("btn sm",have?"In Finds":"Save to Finds",function(){
+    if(!href||DF.findByUrl(state.finds,href)){toast("Already in Finds.");return}
+    var now=Date.now(),price=num(x.price);
+    putDoc("finds",uid(),{url:href,title:x.title||"Listing",price:price,miles:num(x.miles),year:num(x.year),vin:DF.checkVin(x.vin||"").ok?DF.cleanVin(x.vin):"",
+      photo:src||"",location:x.location||"",source:"search",sourceName:x.source,sellerType:x.sellerType||"",titleStatus:DF.detectTitle(x.title),
+      searchId:"",stage:"",specs:"",recalls:null,priceHistory:price!=null?[{price:price,at:now}]:[],status:"saved",foundAt:now})
+    .then(function(){sv.textContent="In Finds";sv.disabled=true;toast("Saved to Finds")})});
+  if(have)sv.disabled=true;act.appendChild(sv);
+  bd.appendChild(act);card.appendChild(bd);return card}
+$("search-all").addEventListener("click",runSearchAll);
+$("r-sort").addEventListener("change",renderResults);
+$("workerUrl").addEventListener("change",function(){var v=$("workerUrl").value.trim();var u=v?safeUrl(v):"";
+  if(v&&(!u||!/^https:/.test(u))){toast("The address should start with https://");return}
+  state.settings.workerUrl=u?u.replace(/\/+$/,""):"";$("workerUrl").value=state.settings.workerUrl;saveSettings();toast("Search server saved")});
+$("accessCode").addEventListener("change",function(){try{localStorage.setItem(ACCESS,$("accessCode").value)}catch(e){}toast("Access code saved on this device")});
+$("test-worker").addEventListener("click",function(){var out=$("worker-out");out.textContent="Checking…";
+  var p=new URLSearchParams({vehicles:"Toyota Camry",zip:/^\d{5}$/.test($("zip").value)?$("zip").value:""});
+  callWorker("/search",p).then(function(j){var en=j.enabled||[];out.textContent=en.length?("Connected. Sources with keys: "+en.join(", ")+". A test search found "+(j.results||[]).length+" listings."):"Connected, but no sources have keys yet. Add at least one key to your search server."},
+    function(e){out.textContent=e.message})});
+
 /* ---------- backup ---------- */
 $("export").addEventListener("click",function(){
   var data=JSON.stringify(DF.makeBackup(state),null,1);var name="driveway-finds-backup-"+new Date().toISOString().slice(0,10)+".json";
@@ -633,7 +749,7 @@ function route(){var h=(location.hash||"").replace("#","");if(["search","watchli
 window.addEventListener("hashchange",route);
 
 /* ---------- start ---------- */
-fillStages($("a-stage"),"");
+fillStages($("a-stage"),"");try{$("accessCode").value=accessCode()}catch(e){}
 fillForm(Object.assign(blank(),loadDraft()||EXAMPLE));loadLocal();route();renderAll();
 
 function rows(snap){return snap.docs.map(function(d){return Object.assign({id:d.id},d.data())})}

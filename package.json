@@ -3,6 +3,6 @@
   "private": true,
   "description": "Used car and truck search page. No build step.",
   "scripts": {
-    "test": "node --test test/core.test.js test/ui.test.js"
+    "test": "node --test test/core.test.js test/worker.test.js test/ui.test.js"
   }
 }
