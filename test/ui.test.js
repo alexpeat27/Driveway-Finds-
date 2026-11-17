@@ -199,3 +199,35 @@ test("Search everything shows merged results with photos and saves to Finds", { 
     await browser.close();
   }
 });
+
+test("VIN lookup: a second VIN replaces the auto-filled title, and NHTSA's 400 means no recalls", { skip: !chromium && "playwright is not installed" }, async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
+  const cors = { "access-control-allow-origin": "*" };
+  await page.route("https://vpic.nhtsa.dot.gov/**", (r) => {
+    const bus = r.request().url().includes("1M8GDM9AXKP042788");
+    r.fulfill({ headers: cors, contentType: "application/json", body: JSON.stringify({ Results: [bus
+      ? { ModelYear: "1989", Make: "MOTOR COACH INDUSTRIES", Model: "102C3", ErrorCode: "0" }
+      : { ModelYear: "2016", Make: "TOYOTA", Model: "Tacoma", ErrorCode: "0" }] }) });
+  });
+  await page.route("https://api.nhtsa.gov/**", (r) => r.fulfill({ status: 400, headers: cors, contentType: "application/json", body: '{"Count":0,"Message":"Results returned successfully","results":[]}' }));
+  try {
+    await page.goto(PAGE + "#finds");
+    await page.fill("#a-vin", "1M8GDM9AXKP042788");
+    await page.click("#a-vin-go");
+    await page.waitForFunction(() => /Motor Coach/.test(document.getElementById("a-vin-out").textContent));
+    assert.match(await page.textContent("#a-vin-out"), /No recalls on record/);
+    await page.fill("#a-vin", "5TFJX4GN1FX040123");
+    await page.click("#a-vin-go");
+    await page.waitForFunction(() => /Tacoma/.test(document.getElementById("a-vin-out").textContent));
+    assert.equal(await page.inputValue("#a-title"), "2016 Toyota Tacoma");
+    // A title the person typed is left alone.
+    await page.fill("#a-title", "My pick");
+    await page.fill("#a-vin", "1M8GDM9AXKP042788");
+    await page.click("#a-vin-go");
+    await page.waitForFunction(() => /Motor Coach/.test(document.getElementById("a-vin-out").textContent));
+    assert.equal(await page.inputValue("#a-title"), "My pick");
+  } finally {
+    await browser.close();
+  }
+});

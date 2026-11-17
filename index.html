@@ -588,10 +588,12 @@ function lookupVin(v){
   return getJson(DF.vpicUrl(v)).then(function(j){var d=DF.parseVpic(j);if(!d){toast("NHTSA has no record of that VIN. Check it against the car.");return null}
     var base={title:d.title,year:d.year,specs:d.specs,recalls:null,partial:d.partial};
     if(!d.make||!d.model||!d.year)return base;
-    return getJson(DF.recallsUrl(d.make,d.model,d.year)).then(function(r){base.recalls=DF.parseRecalls(r);return base},function(){return base})})
+    /* NHTSA answers "no recalls" with status 400 and an empty list, so read the body whatever the status. */
+    return fetch(DF.recallsUrl(d.make,d.model,d.year)).then(function(r){return r.json()}).then(function(r){
+      if(r&&Array.isArray(r.results||r.Results))base.recalls=DF.parseRecalls(r);return base},function(){return base})})
   .catch(function(){toast("Could not reach NHTSA right now. Try again later.");return null})}
 
-var vinResult=null;
+var vinResult=null,autoTitle="";
 function vinOut(text){$("a-vin-out").textContent=text}
 $("a-vin-go").addEventListener("click",function(){
   var c=DF.checkVin($("a-vin").value);
@@ -599,7 +601,8 @@ $("a-vin-go").addEventListener("click",function(){
   $("a-vin").value=c.vin;vinOut("Looking it up…");var b=$("a-vin-go");b.disabled=true;
   lookupVin(c.vin).then(function(r){b.disabled=false;vinResult=r?Object.assign({vin:c.vin},r):null;
     if(!r){vinOut(c.checkDigit?"No details found.":"No details found. The VIN's check digit doesn't match either, so it may be mistyped.");return}
-    if(!$("a-title").value.trim()&&r.title)$("a-title").value=r.title;
+    /* Fill the title unless the person typed their own. */
+    var cur=$("a-title").value.trim();if(r.title&&(!cur||cur===autoTitle)){$("a-title").value=r.title;autoTitle=r.title}
     var msg=[r.title,r.specs].filter(Boolean).join(". ");
     if(r.recalls)msg+=". "+(r.recalls.count?r.recalls.count+" recalls on record for this model and year.":"No recalls on record for this model and year.");
     if(!c.checkDigit)msg+=" Note: the check digit doesn't match, so double-check the VIN.";
@@ -643,7 +646,7 @@ $("add").addEventListener("submit",function(e){e.preventDefault();
     source:/facebook\.com$/.test(host)?"facebook":/craigslist\.org$/.test(host)?"craigslist":"manual",sourceName:site,titleStatus:$("a-tstatus").value||DF.detectTitle(t),
     searchId:$("a-search").value||"",stage:$("a-stage").value||"",vin:vin,specs:vr?vr.specs:"",recalls:vr?vr.recalls:null,
     priceHistory:price!=null?[{price:price,at:now}]:[],status:"saved",foundAt:now})
-  .then(function(){$("add").reset();vinResult=null;vinOut("Fills in the year, make, model and engine, and checks recalls, using free NHTSA data.");$("a-site").textContent="Works with links from any car site.";toast("Added to Finds")})});
+  .then(function(){$("add").reset();vinResult=null;autoTitle="";vinOut("Fills in the year, make, model and engine, and checks recalls, using free NHTSA data.");$("a-site").textContent="Works with links from any car site.";toast("Added to Finds")})});
 
 /* ---------- search everything ---------- */
 var ACCESS="driveway-finds-access";
