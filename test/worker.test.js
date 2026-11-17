@@ -140,6 +140,20 @@ test("several vehicles are searched separately, at most five", async () => {
   assert.deepEqual(makes.sort(), ["ford", "land rover"]);
 });
 
+test("Anywhere in the US sends no ZIP, so services search nationwide", async () => {
+  mock();
+  await W.default.fetch(req("vehicles=Toyota+Tacoma&zip=15222&dist=any"), ENV);
+  for (const host of ["api.auto.dev", "/search/car/active"]) {
+    const p = new URL(calls.find((c) => c.url.includes(host)).url).searchParams;
+    assert.equal(p.get("zip"), null, host + " got a ZIP");
+  }
+  mock();
+  await W.default.fetch(req("vehicles=Toyota+Tacoma&zip=15222&dist=250"), ENV);
+  const ad = new URL(calls.find((c) => c.url.includes("api.auto.dev")).url).searchParams;
+  assert.equal(ad.get("zip"), "15222");
+  assert.equal(ad.get("distance"), "250");
+});
+
 test("no vehicle is a clear error", async () => {
   mock();
   const r = await W.default.fetch(req("vehicles="), ENV);
