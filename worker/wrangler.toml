@@ -1,0 +1,6 @@
+name = "driveway-finds"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+
+# Secrets are not stored here. Add them in the Cloudflare dashboard
+# (Settings > Variables and Secrets) or with: npx wrangler secret put ACCESS_CODE

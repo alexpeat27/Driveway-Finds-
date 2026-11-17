@@ -107,6 +107,32 @@ ol.steps b{color:var(--ink)}
 .toast.on{opacity:1}
 .check{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--ink)}
 .check input{width:18px;height:18px;accent-color:var(--accent)}
+.legend{font-family:var(--display);font-size:16px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:8px}
+.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.vinrow{display:grid;grid-template-columns:1fr auto;gap:8px}
+details.more summary{cursor:pointer;font-weight:600;font-size:14px;padding:6px 0}
+details.more .stack{margin-top:8px}
+.skipped{font-size:13px;color:var(--warn);background:var(--warn-bg);border-radius:7px;padding:8px 12px;margin:12px 0 0}
+.skipped b{font-weight:600}
+.edit{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;background:var(--sunk);border-radius:8px;padding:12px}
+.edit .wide{grid-column:1/-1}
+.edit textarea{width:100%;min-height:64px;font:inherit;font-size:15px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:8px 10px}
+.history{font-size:13px;color:var(--muted);margin:6px 0 0}
+.btn.armed{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.big{min-height:52px;font-size:17px}
+.results{margin-top:28px}
+.results h2{font-size:26px;text-transform:uppercase;margin-right:auto}
+.r-status{font-size:13px;color:var(--muted);margin:-4px 0 14px;display:flex;flex-wrap:wrap;gap:6px}
+.grid-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+.rc{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column}
+.rc .ph{aspect-ratio:4/3;background:var(--sunk);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;overflow:hidden}
+.rc .ph img{width:100%;height:100%;object-fit:cover;display:block}
+.rc .bd{padding:12px;display:flex;flex-direction:column;gap:6px;flex:1}
+.rc h3{font-size:19px;overflow-wrap:anywhere}
+.rc .price{font-size:24px}
+.rc .meta{margin:0}
+.rc .actions{margin-top:auto;padding-top:6px}
+.thumb{width:120px;aspect-ratio:4/3;object-fit:cover;border-radius:7px;background:var(--sunk);display:block;margin-bottom:8px}
 @media (max-width:820px){
   .bench,.cols{grid-template-columns:1fr}
   .launch{position:static}
@@ -185,18 +211,32 @@ ol.steps b{color:var(--ink)}
       </form>
 
       <aside class="card launch" aria-live="polite">
-        <legend>Your search</legend>
+        <div class="legend">Your search</div>
         <div class="plate" id="plate">Any vehicle</div>
         <div class="chips" id="chips"></div>
         <div class="stack">
+          <button type="button" class="btn go big" id="search-all">Search everything, show results here</button>
           <div class="stack" id="fb-links"></div>
-          <a class="btn go" id="open-cl" target="_blank" rel="noopener">Open on Craigslist, by owner</a>
+          <div class="stack" id="cl-links"></div>
           <div class="stack" id="at-links"></div>
+          <details class="more">
+            <summary>More sites: Cars.com and OfferUp</summary>
+            <div class="stack" id="more-links"></div>
+          </details>
           <button type="button" class="btn flag" id="flag">Flag this search to the Watchlist</button>
         </div>
-        <p class="note">Each opens in a new tab, newest listings first, private sellers only. Facebook searches one vehicle at a time, so you get a button for each. It takes price, year, mileage and keywords and uses the distance set on your Facebook location. Craigslist stops at 500 miles and only covers the region around your city, so for long distances lean on the many-sites button. Craigslist takes every filter here and all your vehicles at once. The many-sites button runs the search on AutoTempest, which pulls in Cars.com, Carvana, eBay Motors, TrueCar and others; it also takes one vehicle at a time and shows Autotrader, CarGurus and Facebook as links.</p>
+        <div class="skipped" id="skipped" hidden></div>
+        <p class="note">Each opens in a new tab with the newest listings first. Facebook and Craigslist show private sellers only. Facebook, AutoTempest, Cars.com and OfferUp search one vehicle at a time, so you get a button for each vehicle. Facebook uses the distance set on your Facebook location. Craigslist takes every filter and all your vehicles at once, but only covers one city's region and stops at 500 miles. Add nearby Craigslist sites on the Watchlist tab to cover more ground. AutoTempest pulls in Cars.com, Carvana, eBay Motors, TrueCar and others.</p>
       </aside>
     </div>
+    <section class="results" id="results" hidden aria-live="polite">
+      <div class="bar">
+        <h2 id="r-head">Results</h2>
+        <select id="r-sort" aria-label="Sort results"><option value="new">Newest first</option><option value="price">Lowest price</option><option value="miles">Lowest miles</option><option value="cpm">Lowest cost per remaining mile</option></select>
+      </div>
+      <div class="r-status" id="r-status"></div>
+      <div class="grid-cards" id="r-list"></div>
+    </section>
   </section>
 
   <!-- WATCHLIST -->
@@ -213,6 +253,7 @@ ol.steps b{color:var(--ink)}
             <select id="digest"><option value="daily">Every day</option><option value="weekly">Once a week (Monday)</option><option value="off">Off, just fill the Finds tab</option></select>
           </label>
           <div class="status" id="run-status">No check has run yet.</div>
+          <p class="note" id="auto-note" hidden>Automatic checks are not set up for this copy of the page, so nothing will be added or emailed on its own. Add listings yourself on the Finds tab. Your data is saved in this browser only, so download a backup now and then.</p>
         </div>
         <div class="card">
           <h2>Turn on alerts once</h2>
@@ -230,8 +271,29 @@ ol.steps b{color:var(--ink)}
             <label class="f">Craigslist site<input type="text" id="clSite" placeholder="pittsburgh"></label>
           </div>
           <p class="note">These are the city names that appear in each site's web address.</p>
+          <label class="f" style="margin-top:12px">Nearby Craigslist sites, separated by commas (optional)<input type="text" id="clExtra" placeholder="morgantown, wheeling, youngstown"></label>
+          <p class="note">Each one gets its own Craigslist button, so a long-distance search covers more than one city.</p>
           <label class="f" style="margin-top:12px">Expected lifespan of a vehicle (miles)<input type="number" id="life" min="100000" max="500000" step="10000" placeholder="200000"></label>
           <p class="note">Cost per remaining mile is price divided by lifespan minus the odometer. It needs a price and miles on the listing.</p>
+        </div>
+        <div class="card" id="setup">
+          <h2>Search everything</h2>
+          <p class="sub">The Search everything button asks your own small search server, which checks MarketCheck, Auto.dev and eBay Motors at once. Paste its address and your access code here.</p>
+          <div class="stack">
+            <label class="f">Search server address<input type="url" id="workerUrl" placeholder="https://driveway-finds.yourname.workers.dev" spellcheck="false"></label>
+            <label class="f">Access code (saved on this device only)<input type="password" id="accessCode" autocomplete="off"></label>
+            <div class="row"><button type="button" class="btn sm" id="test-worker">Test connection</button></div>
+            <div class="note" id="worker-out" style="margin:0" aria-live="polite"></div>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Backup</h2>
+          <p class="sub">Save your searches, finds and settings to a file, or bring a file back in. Bringing one in adds what is missing and never overwrites what is here.</p>
+          <div class="row">
+            <button type="button" class="btn sm" id="export">Download backup</button>
+            <label class="btn sm" for="import">Restore from a file</label>
+            <input type="file" id="import" accept="application/json,.json" class="visually-hidden">
+          </div>
         </div>
       </div>
     </div>
@@ -248,7 +310,7 @@ ol.steps b{color:var(--ink)}
             <button type="button" data-show="hidden" aria-pressed="false">Hidden</button>
           </div>
           <select id="find-search" aria-label="Filter by flagged search"><option value="">All searches</option></select>
-          <select id="find-sort" aria-label="Sort"><option value="new">Newest first</option><option value="price">Lowest price</option><option value="cpm">Lowest cost per remaining mile</option><option value="deal">Most under budget</option></select>
+          <select id="find-sort" aria-label="Sort"><option value="new">Newest first</option><option value="price">Lowest price</option><option value="cpm">Lowest cost per remaining mile</option><option value="deal">Most under budget</option><option value="drop">Biggest price drop</option></select>
         </div>
         <div class="list" id="find-list"></div>
       </div>
@@ -258,12 +320,17 @@ ol.steps b{color:var(--ink)}
         <div class="stack">
           <label class="f">Listing link from any site<input type="url" id="a-url" placeholder="Paste a link from Cars.com, Autotrader, CarGurus, Facebook..." required></label>
           <div class="note" id="a-site" style="margin:-4px 0 0">Works with links from any car site.</div>
+          <label class="f">VIN (optional)
+            <span class="vinrow"><input type="text" id="a-vin" maxlength="20" autocapitalize="characters" spellcheck="false" placeholder="17 letters and numbers"><button type="button" class="btn sm" id="a-vin-go">Look up</button></span>
+          </label>
+          <div class="note" id="a-vin-out" style="margin:-4px 0 0" aria-live="polite">Fills in the year, make, model and engine, and checks recalls, using free NHTSA data.</div>
           <label class="f">Title (optional, filled in from the link when possible)<input type="text" id="a-title" placeholder="2015 Tacoma TRD 4x4"></label>
           <div class="pair">
             <label class="f">Price ($)<input type="number" id="a-price" min="0" step="100"></label>
             <label class="f">Miles<input type="number" id="a-miles" min="0" step="1000"></label>
           </div>
           <label class="f">Title status<select id="a-tstatus"><option value="">Not stated (check the ad)</option><option value="clean">Clean</option><option value="rebuilt">Rebuilt</option><option value="salvage">Salvage</option></select></label>
+          <label class="f">Stage<select id="a-stage"></select></label>
           <label class="f">Goes with<select id="a-search"><option value="">No flagged search</option></select></label>
           <button class="btn go" type="submit">Add to Finds</button>
         </div>
@@ -273,117 +340,47 @@ ol.steps b{color:var(--ink)}
 </div>
 <div class="toast" id="toast" role="status"></div>
 
+<script src="core.js"></script>
 <script>
 (function(){
 "use strict";
 var $=function(id){return document.getElementById(id)};
-var FIELDS=["vehicles","yearMin","yearMax","body","drive","cyl","engine","fuel","trans","kw","priceMin","priceMax","milesMax","zip","dist"];
-var LABELS={body:{"7":"Pickup","10":"SUV","8":"Sedan","3":"Coupe","4":"Hatchback","11":"Wagon","12":"Van","5":"Minivan","2":"Convertible","6":"Off-road"},
-  drive:{"3":"4x4","2":"RWD","1":"FWD"},cyl:{"2":"4 cyl","4":"6 cyl","5":"8 cyl","6":"10 cyl"},fuel:{"1":"Gas","2":"Diesel","3":"Hybrid","4":"Electric"},trans:{"2":"Automatic","1":"Manual"}};
+var DF=window.DF;
+var FIELDS=DF.FIELDS,LABELS=DF.LABELS,money=DF.money,num=DF.num,slug=DF.slug,safeUrl=DF.safeUrl,vlist=DF.vlist,title=DF.title,chipList=DF.chipList;
 var EXAMPLE={vehicles:"Toyota Tacoma",yearMin:"2012",yearMax:"2019",body:"7",drive:"3",cyl:"",engine:"",fuel:"",trans:"",kw:"",priceMin:"",priceMax:"22000",milesMax:"100000",zip:"15222",dist:"50"};
+var DEFAULT_SETTINGS={fbCity:"pittsburgh",clSite:"pittsburgh",clExtra:"",digest:"daily",lifespan:200000,workerUrl:""};
 
-var state={searches:[],finds:[],settings:{fbCity:"pittsburgh",clSite:"pittsburgh",digest:"daily",lifespan:200000},status:null,show:"active"};
+var state={searches:[],finds:[],settings:Object.assign({},DEFAULT_SETTINGS),status:null,show:"active",editing:null,results:null};
 var db=null;
 
 /* ---------- helpers ---------- */
-function money(n){return (n||n===0)&&!isNaN(n)?"$"+Number(n).toLocaleString("en-US"):""}
-function num(v){var n=parseFloat(v);return isNaN(n)?null:n}
-function slug(s,fallback){s=String(s||"").toLowerCase().replace(/[^a-z0-9-]/g,"");return s||fallback}
 function uid(){try{return crypto.randomUUID().replace(/-/g,"").slice(0,20)}catch(e){return "id"+Date.now()+Math.floor(Math.random()*1e6)}}
-var SITES=[["cars.com","Cars.com"],["autotrader.com","Autotrader"],["cargurus.com","CarGurus"],["carmax.com","CarMax"],["carvana.com","Carvana"],["truecar.com","TrueCar"],["edmunds.com","Edmunds"],["ebay.com","eBay Motors"],["carsandbids.com","Cars & Bids"],["bringatrailer.com","Bring a Trailer"],["hemmings.com","Hemmings"],["autotempest.com","AutoTempest"],["facebook.com","Facebook"],["craigslist.org","Craigslist"],["offerup.com","OfferUp"],["copart.com","Copart"],["iaai.com","IAA"],["acvauctions.com","ACV"],["kbb.com","Kelley Blue Book"],["carfax.com","Carfax"],["cargurus.ca","CarGurus"],["privateauto.com","PrivateAuto"],["carsoup.com","CarSoup"],["carsdirect.com","CarsDirect"],["vroom.com","Vroom"]];
-function siteOf(u){try{var h=new URL(u).hostname.replace(/^www\./,"").toLowerCase();
-  for(var i=0;i<SITES.length;i++){if(h===SITES[i][0]||h.slice(-SITES[i][0].length-1)==="."+SITES[i][0])return SITES[i][1]}
-  return h}catch(e){return ""}}
-function guessTitle(u){try{var segs=new URL(u).pathname.split("/").filter(Boolean).map(decodeURIComponent);var best="";
-  segs.forEach(function(s){var t=s.replace(/\.[a-z]{2,5}$/i,"");if(/[a-z]{3}/i.test(t)&&/[-_+]/.test(t)&&t.length>best.length&&!/^(vehicledetail|marketplace|item|listing|vehicle|cars?|used|detail|details)$/i.test(t))best=t});
-  if(!best||!/\b(19[5-9]\d|20[0-3]\d)\b/.test(best.replace(/[-_+]+/g," ")))return "";var w=best.replace(/[-_+]+/g," ").replace(/\b[0-9a-f]{8,}\b/gi,"").replace(/\s+/g," ").trim();
-  return w.replace(/\b([a-z])([a-z]*)/g,function(m,a,b){return a.toUpperCase()+b})}catch(e){return ""}}
-function detectTitle(t){t=String(t||"").toLowerCase();
-  if(/\b(no|not|never|non|without)\W+(a\W+|any\W+)?(salvage|salvaged|rebuilt)\b/.test(t))return "";
-  if(/\b(salvage|salvaged)\b|junk title|total loss|flood (damage|title|car)|parts only/.test(t))return "salvage";
-  if(/\b(rebuilt|reconstructed|branded)\b\W{0,3}(title|status)|\btitle\W{0,3}(rebuilt|reconstructed|branded)\b|\brebuilt\/salvage|\bsalvage\/rebuilt/.test(t))return "rebuilt";
-  return ""}
-function safeUrl(u){try{var x=new URL(String(u));return (x.protocol==="https:"||x.protocol==="http:")?x.href:null}catch(e){return null}}
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e}
-var toastT;function toast(msg){var t=$("toast");t.textContent=msg;t.classList.add("on");clearTimeout(toastT);toastT=setTimeout(function(){t.classList.remove("on")},2600)}
+function link(cls,text,href){var a=el("a",cls,text);a.href=href;a.target="_blank";a.rel="noopener";return a}
+function btn(cls,text,fn){var b=el("button",cls,text);b.type="button";b.addEventListener("click",fn);return b}
+var toastT;function toast(msg){var t=$("toast");t.textContent=msg;t.classList.add("on");clearTimeout(toastT);toastT=setTimeout(function(){t.classList.remove("on")},3200)}
+/* Two-step button for anything that cannot be undone: first click arms it, second click within 4 seconds runs it.
+   Used instead of confirm(), which some embedded viewers block. */
+function confirmBtn(cls,text,armedText,fn){var b=el("button",cls,text);b.type="button";var t=null;
+  b.addEventListener("click",function(){if(t){clearTimeout(t);t=null;fn();return}
+    b.textContent=armedText;b.classList.add("armed");t=setTimeout(function(){t=null;b.textContent=text;b.classList.remove("armed")},4000)});return b}
+function fmtDate(ms){return new Date(ms).toLocaleDateString("en-US",{month:"short",day:"numeric"})}
 
-function vtext(c){if(c.vehicles!=null&&c.vehicles!=="")return String(c.vehicles);return [c.make,c.model].filter(Boolean).join(" ")}
-function vlist(c){var seen={};return vtext(c).split(/[,;\n]+/).map(function(s){return s.replace(/\s+/g," ").trim()}).filter(function(s){var k=s.toLowerCase();if(!s||seen[k])return false;seen[k]=1;return true})}
 function readForm(){var c={};FIELDS.forEach(function(k){c[k]=$(k).value.trim()});return c}
-function fillForm(c){c=Object.assign({},c,{vehicles:vtext(c)});FIELDS.forEach(function(k){if(c[k]!=null)$(k).value=c[k]});
+function fillForm(c){c=Object.assign({},c,{vehicles:DF.vtext(c)});FIELDS.forEach(function(k){if(c[k]!=null)$(k).value=c[k]});
   var d=$("dist");if(d.value===""){var n=Number(c.dist)||50,opts=Array.prototype.map.call(d.options,function(o){return Number(o.value)}).filter(function(x){return !isNaN(x)});d.value=String(opts.filter(function(x){return x>=n})[0]||1000)}}
+function blank(){var b={};FIELDS.forEach(function(k){b[k]=""});b.dist="50";return b}
 
-function title(c){var t=vlist(c).join(", ");
-  if(!t)t=LABELS.body[c.body]?("Any "+LABELS.body[c.body]):"Any vehicle";return t}
-function chipList(c){var out=[];
-  if(c.yearMin||c.yearMax)out.push((c.yearMin||"any")+" to "+(c.yearMax||"now"));
-  if(vlist(c).length){if(LABELS.body[c.body])out.push(LABELS.body[c.body])}
-  ["drive","cyl","fuel","trans"].forEach(function(k){if(LABELS[k][c[k]])out.push(LABELS[k][c[k]])});
-  if(c.engine)out.push(c.engine);
-  if(c.kw)out.push(c.kw);
-  if(c.priceMin||c.priceMax)out.push((c.priceMin?money(c.priceMin):"$0")+" to "+(c.priceMax?money(c.priceMax):"any"));
-  if(c.milesMax)out.push("under "+Number(c.milesMax).toLocaleString("en-US")+" mi");
-  if(c.dist==="any")out.push("Anywhere in the US");else if(c.zip)out.push(Number(c.dist).toLocaleString("en-US")+" mi of "+c.zip);
-  return out}
-
-/* ---------- link builders ---------- */
-function fbUrl(c,s,vehicle){
-  var words=[vehicle,c.drive==="3"?"4x4":"",c.fuel==="2"?"diesel":"",c.engine,c.kw].filter(Boolean).join(" ");
-  var p=new URLSearchParams();
-  if(words)p.set("query",words);
-  if(c.priceMin)p.set("minPrice",c.priceMin);
-  if(c.priceMax)p.set("maxPrice",c.priceMax);
-  if(c.yearMin)p.set("minYear",c.yearMin);
-  if(c.yearMax)p.set("maxYear",c.yearMax);
-  if(c.milesMax)p.set("maxMileage",c.milesMax);
-  p.set("sellerType","individual");
-  p.set("topLevelVehicleType","car_truck");
-  p.set("sortBy","creation_time_descend");
-  p.set("exact","false");
-  return "https://www.facebook.com/marketplace/"+slug(s.fbCity,"pittsburgh")+"/"+(words?"search":"vehicles")+"?"+p.toString();
-}
-function fbLinks(c,s){var v=vlist(c);if(!v.length)return [{label:"",url:fbUrl(c,s,"")}];
-  return v.map(function(x){return {label:x,url:fbUrl(c,s,x)}})}
-function atUrl(c,vehicle){
-  var p=new URLSearchParams();var parts=String(vehicle||"").trim().split(/\s+/);
-  if(parts[0])p.set("make",parts[0].toLowerCase());
-  if(parts.length>1)p.set("model",parts.slice(1).join("").toLowerCase());
-  if(/^\d{5}$/.test(c.zip))p.set("zip",c.zip);
-  var d=Number(c.dist)||50,allowed=[25,50,100,300,500,1000],r=allowed.filter(function(x){return x>=d})[0]||1000;p.set("radius",c.dist==="any"?"any":String(r));
-  if(c.yearMin)p.set("minyear",c.yearMin);if(c.yearMax)p.set("maxyear",c.yearMax);
-  if(c.priceMin)p.set("minprice",c.priceMin);if(c.priceMax)p.set("maxprice",c.priceMax);
-  if(c.milesMax)p.set("maxmiles",c.milesMax);
-  return "https://www.autotempest.com/results?"+p.toString();
-}
-function clUrl(c,s){
-  var p=new URLSearchParams();
-  var v=vlist(c),group="";
-  if(v.length===1)p.set("auto_make_model",v[0]);
-  else if(v.length>1)group=v.map(function(x){return x.indexOf(" ")>=0?"("+x+")":x}).join("|");
-  var q=[group,c.engine,c.kw].filter(Boolean).join(" ");
-  if(q)p.set("query",q);
-  if(c.priceMin)p.set("min_price",c.priceMin);
-  if(c.priceMax)p.set("max_price",c.priceMax);
-  if(c.yearMin)p.set("min_auto_year",c.yearMin);
-  if(c.yearMax)p.set("max_auto_year",c.yearMax);
-  if(c.milesMax)p.set("max_auto_miles",c.milesMax);
-  if(c.body)p.set("auto_bodytype",c.body);
-  if(c.drive)p.set("auto_drivetrain",c.drive);
-  if(c.cyl)p.set("auto_cylinders",c.cyl);
-  if(c.fuel)p.set("auto_fuel_type",c.fuel);
-  if(c.trans)p.set("auto_transmission",c.trans);
-  if(/^\d{5}$/.test(c.zip)&&c.dist!=="any"){p.set("postal",c.zip);p.set("search_distance",String(Math.min(Number(c.dist)||50,500)))}
-  p.set("bundleDuplicates","1");
-  p.set("sort","date");
-  return "https://"+slug(s.clSite,"pittsburgh")+".craigslist.org/search/cto?"+p.toString();
-}
-
+/* The search form is remembered in this browser so a reload does not wipe it. */
+var DRAFT="driveway-finds-draft";
+function saveDraft(){try{localStorage.setItem(DRAFT,JSON.stringify(readForm()))}catch(e){}}
+function loadDraft(){try{var j=JSON.parse(localStorage.getItem(DRAFT)||"null");return j&&typeof j==="object"?j:null}catch(e){return null}}
 
 /* ---------- storage: shared database, with this browser as a fallback ---------- */
 var LS="driveway-finds-v1";
-function loadLocal(){try{var j=JSON.parse(localStorage.getItem(LS)||"null");if(j){state.searches=j.searches||[];state.finds=j.finds||[];state.settings=Object.assign(state.settings,j.settings||{})}}catch(e){}}
-function saveLocal(){if(db)return;try{localStorage.setItem(LS,JSON.stringify({searches:state.searches,finds:state.finds,settings:state.settings}))}catch(e){}}
-function fail(e){toast(e&&e.code==="quota_exceeded"?"Storage is full. Remove some hidden finds and try again.":"That did not save. Check your connection and try again.")}
+function loadLocal(){try{var j=JSON.parse(localStorage.getItem(LS)||"null");if(j){state.searches=j.searches||[];state.finds=j.finds||[];state.settings=Object.assign({},DEFAULT_SETTINGS,j.settings||{})}}catch(e){}}
+function saveLocal(){if(db)return;try{localStorage.setItem(LS,JSON.stringify({searches:state.searches,finds:state.finds,settings:state.settings}))}catch(e){fail({code:"quota_exceeded"})}}
+function fail(e){toast(e&&e.code==="quota_exceeded"?"Storage is full. Delete some hidden finds and try again.":"That did not save. Check your connection and try again.")}
 
 function putDoc(coll,id,data){
   if(db)return db.doc(coll+"/"+id).set(data).catch(fail);
@@ -401,18 +398,29 @@ function saveSettings(){
 
 /* ---------- render: search ---------- */
 function renderLaunch(){
-  var c=readForm();
+  var c=readForm(),s=state.settings;
   $("plate").textContent=title(c);
   var box=$("chips");box.textContent="";
   var list=chipList(c);
   if(!list.length)box.appendChild(el("span","chip","No filters yet"));
   list.forEach(function(t){box.appendChild(el("span","chip",t))});
-  var fb=$("fb-links");fb.textContent="";
-  fbLinks(c,state.settings).forEach(function(l){var a=el("a","btn go",l.label?"Facebook: "+l.label:"Open on Facebook Marketplace");a.href=l.url;a.target="_blank";a.rel="noopener";fb.appendChild(a)});
-  $("open-cl").href=clUrl(c,state.settings);
-  var at=$("at-links");at.textContent="";
   var vs=vlist(c);if(!vs.length)vs=[""];
-  vs.forEach(function(x){var a=el("a","btn",x?"Many sites at once: "+x:"Many sites at once (AutoTempest)");a.href=atUrl(c,x);a.target="_blank";a.rel="noopener";at.appendChild(a)});
+  var fb=$("fb-links");fb.textContent="";
+  DF.fbLinks(c,s).forEach(function(l){fb.appendChild(link("btn go",l.label?"Facebook: "+l.label:"Open on Facebook Marketplace",l.url))});
+  var cl=$("cl-links");cl.textContent="";var sites=DF.clSites(s);
+  sites.forEach(function(site,i){cl.appendChild(link("btn go",sites.length>1?"Craigslist "+site+", by owner":"Open on Craigslist, by owner",DF.clUrl(c,s,site)))});
+  var at=$("at-links");at.textContent="";
+  vs.forEach(function(x){at.appendChild(link("btn",x?"Many sites at once: "+x:"Many sites at once (AutoTempest)",DF.atUrl(c,x)))});
+  var more=$("more-links");more.textContent="";
+  vs.forEach(function(x){more.appendChild(link("btn",x?"Cars.com: "+x:"Cars.com",DF.carsUrl(c,x)))});
+  vs.forEach(function(x){more.appendChild(link("btn",x?"OfferUp: "+x:"OfferUp",DF.offerupUrl(c,x)))});
+  /* Say which filters each site leaves out, so a surprising result has an explanation. */
+  var lines=[["Facebook","facebook"],["Craigslist","craigslist"],["AutoTempest","autotempest"],["Cars.com","carscom"],["OfferUp","offerup"]]
+    .map(function(p){var sk=DF.skippedFilters(p[1],c);return sk.length?[p[0],sk.join(", ")]:null}).filter(Boolean);
+  if(c.dist!=="any"&&Number(c.dist)>150&&sites.length<2)lines.push(["Craigslist","only the "+sites[0]+" region, add nearby sites on the Watchlist tab"]);
+  var sk=$("skipped");sk.textContent="";sk.hidden=!lines.length;
+  if(lines.length){sk.appendChild(document.createTextNode("Filters some sites can't apply. Check these by hand on the results page:"));
+    lines.forEach(function(l){var d=el("div");d.appendChild(el("b",null,l[0]+": "));d.appendChild(document.createTextNode(l[1]));sk.appendChild(d)})}
 }
 
 /* ---------- render: watchlist ---------- */
@@ -421,7 +429,7 @@ function renderWatch(){
   $("n-watch").textContent=state.searches.length;
   if(!state.searches.length){
     var e=el("div","empty");e.appendChild(el("strong",null,"Nothing flagged yet"));
-    e.appendChild(document.createTextNode("Build a search on the Search tab and choose Flag this search. Flagged searches are the ones the daily check and the email report follow."));
+    e.appendChild(document.createTextNode("Build a search on the Search tab and choose Flag this search. Your flagged searches are kept here so you can rerun them."));
     box.appendChild(e);return}
   state.searches.slice().sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0)}).forEach(function(s){
     var c=s.criteria||{};
@@ -429,29 +437,31 @@ function renderWatch(){
     var left=el("div");left.appendChild(el("h3",null,s.name||title(c)));
     var chips=el("div","chips");chips.style.margin="8px 0 0";
     chipList(c).forEach(function(t){chips.appendChild(el("span","chip",t))});left.appendChild(chips);
-    var n=state.finds.filter(function(f){return f.searchId===s.id&&f.status!=="hidden"}).length;
+    var linked=state.finds.filter(function(f){return f.searchId===s.id});
+    var n=linked.filter(function(f){return f.status!=="hidden"}).length;
     var right=el("div");right.appendChild(el("div","price",String(n)));right.appendChild(el("div","meta",n===1?"find":"finds"));
     right.style.textAlign="right";
     var act=el("div","actions");
-    fbLinks(c,state.settings).forEach(function(l){var a1=el("a","btn sm go",l.label?"Facebook: "+l.label:"Facebook");a1.href=l.url;a1.target="_blank";a1.rel="noopener";act.appendChild(a1)});
-    var a2=el("a","btn sm go","Craigslist");a2.href=clUrl(c,state.settings);a2.target="_blank";a2.rel="noopener";
-    var ed=el("button","btn sm","Edit in Search");ed.type="button";
-    ed.addEventListener("click",function(){$("f").reset();fillForm(Object.assign({},blank(),c));renderLaunch();location.hash="search"});
-    var rm=el("button","btn sm quiet","Remove");rm.type="button";
-    rm.addEventListener("click",function(){dropDoc("searches",s.id).then(function(){toast("Removed from the Watchlist")})});
-    act.appendChild(a2);act.appendChild(ed);act.appendChild(rm);
+    DF.fbLinks(c,state.settings).forEach(function(l){act.appendChild(link("btn sm go",l.label?"Facebook: "+l.label:"Facebook",l.url))});
+    DF.clSites(state.settings).forEach(function(site,i){act.appendChild(link("btn sm go",i?"Craigslist "+site:"Craigslist",DF.clUrl(c,state.settings,site)))});
+    act.appendChild(btn("btn sm","Edit in Search",function(){fillForm(Object.assign({},blank(),c));saveDraft();renderLaunch();location.hash="search"}));
+    act.appendChild(confirmBtn("btn sm quiet","Remove",linked.length?"Click again: remove (its "+linked.length+" finds stay)":"Click again to remove",function(){
+      /* Finds that belonged to this search are kept, just unlinked, so nothing points at a missing search. */
+      var jobs=linked.map(function(f){return patchDoc("finds",f.id,{searchId:""})});
+      Promise.all(jobs).then(function(){return dropDoc("searches",s.id)}).then(function(){toast("Removed from the Watchlist")})}));
     ["fb","cl"].forEach(function(k){
       var lab=el("label","check");var cb=document.createElement("input");cb.type="checkbox";cb.id="al-"+k+"-"+s.id;cb.checked=!!(s.alerts&&s.alerts[k]);
       cb.addEventListener("change",function(){var al=Object.assign({fb:false,cl:false},s.alerts||{});al[k]=cb.checked;patchDoc("searches",s.id,{alerts:al})});
       lab.appendChild(cb);lab.appendChild(document.createTextNode(k==="fb"?"Facebook alert on":"Craigslist alert on"));act.appendChild(lab)});
     it.appendChild(left);it.appendChild(right);it.appendChild(act);box.appendChild(it)});
 }
-function blank(){var b={};FIELDS.forEach(function(k){b[k]=""});b.dist="50";return b}
 
 /* ---------- render: finds ---------- */
-function cpm(f){var p=num(f.price),m=num(f.miles),L=Number(state.settings.lifespan)||200000;return (p>0&&m!=null&&m>=0&&m<L)?p/(L-m):null}
-function budgetGap(f){var s=state.searches.find(function(x){return x.id===f.searchId});var max=s&&s.criteria?num(s.criteria.priceMax):null;var p=num(f.price);
-  if(!max||p==null||p<=0)return null;return Math.round((max-p)/max*100)}
+function cpm(f){return DF.cpm(f,state.settings.lifespan)}
+function budgetGap(f){return DF.budgetGap(f,state.searches)}
+function stageName(v){var s=DF.STAGES.find(function(x){return x[0]===v});return s?s[1]:""}
+function fillStages(sel,val){sel.textContent="";DF.STAGES.forEach(function(s){var o=el("option",null,s[1]);o.value=s[0];sel.appendChild(o)});sel.value=val||""}
+
 function renderFinds(){
   var box=$("find-list");box.textContent="";
   var active=state.finds.filter(function(f){return f.status!=="hidden"});
@@ -465,47 +475,94 @@ function renderFinds(){
     if(sort==="cpm"){var A=cpm(a),B=cpm(b);return (A==null?1e9:A)-(B==null?1e9:B)}
     if(sort==="price")return (num(a.price)==null?1e12:num(a.price))-(num(b.price)==null?1e12:num(b.price));
     if(sort==="deal")return (budgetGap(b)==null?-999:budgetGap(b))-(budgetGap(a)==null?-999:budgetGap(a));
+    if(sort==="drop"){var pa=DF.priceChange(a),pb=DF.priceChange(b);return (pb?pb.drop:-1e12)-(pa?pa.drop:-1e12)}
     return (b.foundAt||0)-(a.foundAt||0)});
   if(!rows.length){
     var e=el("div","empty");
     if(!state.finds.length){e.appendChild(el("strong",null,"No finds yet"));
-      e.appendChild(document.createTextNode("Listings land here two ways: the daily check adds new matches from your alert emails, and you can add any listing yourself with the form on this page."))}
+      e.appendChild(document.createTextNode("Add any listing you spot with the form on this page. Paste its link, and add the price, miles and VIN if you have them."))}
     else{e.appendChild(el("strong",null,"Nothing in this view"));e.appendChild(document.createTextNode("Try another filter above."))}
     box.appendChild(e);return}
-  rows.forEach(function(f){
-    var ts=f.titleStatus||detectTitle((f.title||"")+" "+(f.note||""));var branded=ts==="salvage"||ts==="rebuilt";
-    var it=el("div","item"+(f.status==="saved"?" saved":"")+(branded?" branded":""));
-    var left=el("div");left.appendChild(el("h3",null,f.title||"Untitled listing"));
-    var bits=[];if(f.year)bits.push(String(f.year));if(num(f.miles)!=null)bits.push(Number(f.miles).toLocaleString("en-US")+" mi");if(f.location)bits.push(f.location);
-    var s=state.searches.find(function(x){return x.id===f.searchId});if(s)bits.push("for "+(s.name||title(s.criteria||{})));
-    if(f.foundAt)bits.push("found "+new Date(f.foundAt).toLocaleDateString("en-US",{month:"short",day:"numeric"}));
-    left.appendChild(el("div","meta",bits.join("  ·  ")));
-    var pills=el("div","row");
-    pills.appendChild(el("span","pill fb",f.sourceName||(f.source==="craigslist"?"Craigslist":f.source==="facebook"?"Facebook":"Added by you")));
-    if(f.status==="new")pills.appendChild(el("span","pill new","New"));
-    if(branded)pills.appendChild(el("span","pill bad",ts==="salvage"?"Salvage title":"Rebuilt title"));
-    else if(ts==="clean")pills.appendChild(el("span","pill good","Clean title"));
-    else pills.appendChild(el("span","pill fb","Title not stated"));
-    var mi=num(f.miles);if(mi!=null&&mi>=0&&mi<100000)pills.appendChild(el("span","pill good","Under 100k miles"));
-    var cp=cpm(f);if(cp!=null)pills.appendChild(el("span","pill fb","$"+cp.toFixed(2)+" per remaining mile"));
-    if(f.sellerType==="dealer")pills.appendChild(el("span","pill fb","Dealer"));else if(f.sellerType==="private")pills.appendChild(el("span","pill fb","Private seller"));
-    var gap=budgetGap(f);
-    if(gap!=null&&gap>=10)pills.appendChild(el("span","pill good",gap+"% under your max"));
-    else if(gap!=null&&gap<0)pills.appendChild(el("span","pill warn",Math.abs(gap)+"% over your max"));
-    left.appendChild(pills);
-    if(f.note){var nt=el("div","meta",f.note);nt.style.margin="8px 0 0";left.appendChild(nt)}
-    var right=el("div","price",money(num(f.price))||"No price");
-    var bn=null;if(branded){bn=el("div","brand-note",(ts==="salvage"?"Salvage title. ":"Rebuilt title. ")+"Not recommended. Ask for the damage history and the title papers before going further.")}
-    var act=el("div","actions");
-    var href=safeUrl(f.url);
-    if(href){var a=el("a","btn sm go","Open listing");a.href=href;a.target="_blank";a.rel="noopener";act.appendChild(a)}
-    if(f.status!=="saved"){var sv=el("button","btn sm go","Keep");sv.type="button";sv.addEventListener("click",function(){patchDoc("finds",f.id,{status:"saved"})});act.appendChild(sv)}
-    else{var us=el("button","btn sm","Move out of Kept");us.type="button";us.addEventListener("click",function(){patchDoc("finds",f.id,{status:"seen"})});act.appendChild(us)}
-    if(f.status!=="hidden"){var hd=el("button","btn sm quiet","Hide, never show again");hd.type="button";hd.addEventListener("click",function(){patchDoc("finds",f.id,{status:"hidden"})});act.appendChild(hd)}
-    else{var rs=el("button","btn sm","Restore");rs.type="button";rs.addEventListener("click",function(){patchDoc("finds",f.id,{status:"seen"})});act.appendChild(rs);
-      var del=el("button","btn sm quiet","Delete for good");del.type="button";del.addEventListener("click",function(){dropDoc("finds",f.id)});act.appendChild(del)}
-    it.appendChild(left);it.appendChild(right);if(bn)it.appendChild(bn);it.appendChild(act);box.appendChild(it)});
+  rows.forEach(function(f){box.appendChild(findCard(f))});
 }
+function findCard(f){
+  var ts=f.titleStatus||DF.detectTitle((f.title||"")+" "+(f.note||""));var branded=ts==="salvage"||ts==="rebuilt";
+  var it=el("div","item"+(f.status==="saved"?" saved":"")+(branded?" branded":""));it.dataset.id=f.id;
+  var left=el("div");var ph=safeUrl(f.photo);if(ph)left.appendChild(photo(ph,"thumb"));
+  left.appendChild(el("h3",null,f.title||"Untitled listing"));
+  var bits=[];if(f.year)bits.push(String(f.year));if(num(f.miles)!=null)bits.push(Number(f.miles).toLocaleString("en-US")+" mi");if(f.location)bits.push(f.location);
+  var s=state.searches.find(function(x){return x.id===f.searchId});if(s)bits.push("for "+(s.name||title(s.criteria||{})));
+  if(f.foundAt)bits.push("found "+fmtDate(f.foundAt));
+  left.appendChild(el("div","meta",bits.join("  ·  ")));
+  if(f.specs||f.vin){var sp=el("div","meta",[f.specs,f.vin?"VIN "+f.vin:""].filter(Boolean).join("  ·  "));sp.style.marginTop="-4px";left.appendChild(sp)}
+  var pills=el("div","row");
+  pills.appendChild(el("span","pill fb",f.sourceName||(f.source==="craigslist"?"Craigslist":f.source==="facebook"?"Facebook":"Added by you")));
+  if(f.status==="new")pills.appendChild(el("span","pill new","New"));
+  if(f.stage)pills.appendChild(el("span","pill "+(f.stage==="passed"?"warn":"new"),stageName(f.stage)));
+  if(branded)pills.appendChild(el("span","pill bad",ts==="salvage"?"Salvage title":"Rebuilt title"));
+  else if(ts==="clean")pills.appendChild(el("span","pill good","Clean title"));
+  else pills.appendChild(el("span","pill fb","Title not stated"));
+  var mi=num(f.miles);if(mi!=null&&mi>=0&&mi<100000)pills.appendChild(el("span","pill good","Under 100k miles"));
+  var cp=cpm(f);if(cp!=null)pills.appendChild(el("span","pill fb","$"+cp.toFixed(2)+" per remaining mile"));
+  if(f.sellerType==="dealer")pills.appendChild(el("span","pill fb","Dealer"));else if(f.sellerType==="private")pills.appendChild(el("span","pill fb","Private seller"));
+  var gap=budgetGap(f);
+  if(gap!=null&&gap>=10)pills.appendChild(el("span","pill good",gap+"% under your max"));
+  else if(gap!=null&&gap<0)pills.appendChild(el("span","pill warn",Math.abs(gap)+"% over your max"));
+  var pc=DF.priceChange(f);
+  if(pc&&pc.drop>0)pills.appendChild(el("span","pill good","Down "+money(pc.drop)));
+  else if(pc&&pc.drop<0)pills.appendChild(el("span","pill warn","Up "+money(-pc.drop)));
+  if(f.recalls&&f.recalls.count>0)pills.appendChild(el("span","pill warn",f.recalls.count+(f.recalls.count===1?" recall":" recalls")+" for this model"));
+  else if(f.recalls&&f.recalls.count===0)pills.appendChild(el("span","pill good","No recalls for this model"));
+  left.appendChild(pills);
+  if(Array.isArray(f.priceHistory)&&f.priceHistory.length>1)
+    left.appendChild(el("div","history","Price history: "+f.priceHistory.map(function(h){return money(h.price)+" ("+fmtDate(h.at)+")"}).join(" → ")));
+  if(f.note){var nt=el("div","meta",f.note);nt.style.margin="8px 0 0";left.appendChild(nt)}
+  var right=el("div","price",money(num(f.price))||"No price");
+  var act=el("div","actions");
+  var href=safeUrl(f.url);
+  if(href)act.appendChild(link("btn sm go","Open listing",href));
+  act.appendChild(btn("btn sm",state.editing===f.id?"Close editor":"Edit",function(){state.editing=state.editing===f.id?null:f.id;renderFinds()}));
+  if(f.vin)act.appendChild(link("btn sm","This VIN's open recalls",DF.vinRecallPage(f.vin)));
+  if(f.status!=="saved")act.appendChild(btn("btn sm go","Keep",function(){patchDoc("finds",f.id,{status:"saved"})}));
+  else act.appendChild(btn("btn sm","Move out of Kept",function(){patchDoc("finds",f.id,{status:"seen"})}));
+  if(f.status!=="hidden")act.appendChild(btn("btn sm quiet","Hide, never show again",function(){patchDoc("finds",f.id,{status:"hidden"})}));
+  else{act.appendChild(btn("btn sm","Restore",function(){patchDoc("finds",f.id,{status:"seen"})}));
+    act.appendChild(confirmBtn("btn sm quiet","Delete for good","Click again to delete",function(){dropDoc("finds",f.id).then(function(){toast("Deleted")})}))}
+  it.appendChild(left);it.appendChild(right);
+  if(branded)it.appendChild(el("div","brand-note",(ts==="salvage"?"Salvage title. ":"Rebuilt title. ")+"Not recommended. Ask for the damage history and the title papers before going further."));
+  if(state.editing===f.id)it.appendChild(editor(f));
+  it.appendChild(act);
+  return it;
+}
+/* Inline editor for a find. A price change is added to the price history. */
+function editor(f){
+  var form=el("form","edit");form.setAttribute("aria-label","Edit listing");
+  function field(lbl,input,wide){var l=el("label","f"+(wide?" wide":""),lbl);l.appendChild(input);form.appendChild(l);return input}
+  function inp(type,val){var i=document.createElement("input");i.type=type;i.value=val==null?"":val;return i}
+  var t=field("Title",inp("text",f.title),true);
+  var pr=field("Price ($)",inp("number",f.price));pr.min="0";pr.step="100";
+  var mi=field("Miles",inp("number",f.miles));mi.min="0";mi.step="1000";
+  var st=document.createElement("select");fillStages(st,f.stage);field("Stage",st);
+  var ts=document.createElement("select");[["","Not stated"],["clean","Clean"],["rebuilt","Rebuilt"],["salvage","Salvage"]].forEach(function(p){var o=el("option",null,p[1]);o.value=p[0];ts.appendChild(o)});ts.value=f.titleStatus||"";field("Title status",ts);
+  var vin=field("VIN",inp("text",f.vin||""));vin.maxLength=20;vin.spellcheck=false;
+  var sr=document.createElement("select");var o0=el("option",null,"No flagged search");o0.value="";sr.appendChild(o0);
+  state.searches.forEach(function(x){var o=el("option",null,x.name||title(x.criteria||{}));o.value=x.id;sr.appendChild(o)});sr.value=f.searchId||"";field("Goes with",sr);
+  var nt=document.createElement("textarea");nt.value=f.note||"";field("Notes",nt,true);
+  var row=el("div","row wide");
+  var save=el("button","btn sm go","Save changes");save.type="submit";row.appendChild(save);
+  row.appendChild(btn("btn sm quiet","Cancel",function(){state.editing=null;renderFinds()}));
+  form.appendChild(row);
+  form.addEventListener("submit",function(e){e.preventDefault();
+    var v=DF.cleanVin(vin.value);if(v&&!DF.checkVin(v).ok){toast("A VIN is 17 letters and numbers, without I, O or Q.");return}
+    var np=num(pr.value),now=Date.now();
+    var patch={title:t.value.trim()||f.title||"",price:np,miles:num(mi.value),stage:st.value,titleStatus:ts.value,searchId:sr.value,note:nt.value.trim(),vin:v};
+    if(np!==num(f.price))patch.priceHistory=DF.withPrice(f.priceHistory,f.price,np,now);
+    if(v!==(f.vin||"")){patch.recalls=null;patch.specs=""}
+    state.editing=null;
+    patchDoc("finds",f.id,patch).then(function(){toast("Saved");if(v&&v!==(f.vin||""))lookupVin(v).then(function(r){if(r)patchDoc("finds",f.id,{specs:r.specs,recalls:r.recalls,year:r.year||f.year||null})})})});
+  return form;
+}
+
 function renderSelects(){
   [["find-search","All searches"],["a-search","No flagged search"]].forEach(function(p){
     var s=$(p[0]),keep=s.value;s.textContent="";var o=el("option",null,p[1]);o.value="";s.appendChild(o);
@@ -513,39 +570,177 @@ function renderSelects(){
     s.value=state.searches.some(function(x){return x.id===keep})?keep:""});
 }
 function renderSettings(){
-  if(document.activeElement!==$("fbCity"))$("fbCity").value=state.settings.fbCity||"";
-  if(document.activeElement!==$("clSite"))$("clSite").value=state.settings.clSite||"";
+  ["fbCity","clSite","clExtra","workerUrl"].forEach(function(k){if(document.activeElement!==$(k))$(k).value=state.settings[k]||""});
   $("digest").value=state.settings.digest||"daily";
   if(document.activeElement!==$("life"))$("life").value=state.settings.lifespan||200000;
   var st=state.status;
   $("run-status").textContent=st&&st.lastRun?("Last check: "+new Date(st.lastRun).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})+(st.added!=null?", "+st.added+" new":"")+(st.note?". "+st.note:"")):"No check has run yet.";
+  $("auto-note").hidden=!!db;
 }
 function renderAll(){renderLaunch();renderSelects();renderWatch();renderFinds();renderSettings()}
 
+/* ---------- VIN lookup (free NHTSA data, no key) ---------- */
+function getJson(url){var ctl=typeof AbortController!=="undefined"?new AbortController():null;var t=setTimeout(function(){if(ctl)ctl.abort()},12000);
+  return fetch(url,ctl?{signal:ctl.signal}:{}).then(function(r){clearTimeout(t);if(!r.ok)throw new Error("http "+r.status);return r.json()},function(e){clearTimeout(t);throw e})}
+/* Resolves {title,year,specs,recalls} or null. Recalls are for the model and year; open recalls on this exact
+   vehicle are on NHTSA's VIN page, which the card links to. */
+function lookupVin(v){
+  return getJson(DF.vpicUrl(v)).then(function(j){var d=DF.parseVpic(j);if(!d){toast("NHTSA has no record of that VIN. Check it against the car.");return null}
+    var base={title:d.title,year:d.year,specs:d.specs,recalls:null,partial:d.partial};
+    if(!d.make||!d.model||!d.year)return base;
+    return getJson(DF.recallsUrl(d.make,d.model,d.year)).then(function(r){base.recalls=DF.parseRecalls(r);return base},function(){return base})})
+  .catch(function(){toast("Could not reach NHTSA right now. Try again later.");return null})}
+
+var vinResult=null;
+function vinOut(text){$("a-vin-out").textContent=text}
+$("a-vin-go").addEventListener("click",function(){
+  var c=DF.checkVin($("a-vin").value);
+  if(!c.ok){vinOut("A VIN is 17 letters and numbers, without I, O or Q.");return}
+  $("a-vin").value=c.vin;vinOut("Looking it up…");var b=$("a-vin-go");b.disabled=true;
+  lookupVin(c.vin).then(function(r){b.disabled=false;vinResult=r?Object.assign({vin:c.vin},r):null;
+    if(!r){vinOut(c.checkDigit?"No details found.":"No details found. The VIN's check digit doesn't match either, so it may be mistyped.");return}
+    if(!$("a-title").value.trim()&&r.title)$("a-title").value=r.title;
+    var msg=[r.title,r.specs].filter(Boolean).join(". ");
+    if(r.recalls)msg+=". "+(r.recalls.count?r.recalls.count+" recalls on record for this model and year.":"No recalls on record for this model and year.");
+    if(!c.checkDigit)msg+=" Note: the check digit doesn't match, so double-check the VIN.";
+    vinOut(msg)})});
+$("a-vin").addEventListener("input",function(){vinResult=null});
+
 /* ---------- events ---------- */
-$("f").addEventListener("input",renderLaunch);
+$("f").addEventListener("input",function(){renderLaunch();saveDraft()});
 $("f").addEventListener("submit",function(e){e.preventDefault()});
-$("clear").addEventListener("click",function(){fillForm(blank());renderLaunch()});
+$("clear").addEventListener("click",function(){fillForm(blank());saveDraft();renderLaunch()});
 $("flag").addEventListener("click",function(){
-  var c=readForm();var name=title(c)+(c.yearMin||c.yearMax?" "+(c.yearMin||"")+"-"+(c.yearMax||""):"");
+  var c=readForm();
+  var dup=state.searches.find(function(s){return DF.sameCriteria(s.criteria,c)});
+  if(dup){toast("That search is already on the Watchlist.");return}
+  var name=title(c)+(c.yearMin||c.yearMax?" "+(c.yearMin||"")+"-"+(c.yearMax||""):"");
   putDoc("searches",uid(),{name:name.trim(),criteria:c,alerts:{fb:false,cl:false},createdAt:Date.now()}).then(function(){toast("Flagged. It is on the Watchlist.")})});
 $("life").addEventListener("change",function(){var v=Math.round(Number($("life").value));if(!(v>=100000&&v<=500000)){toast("Enter a lifespan between 100,000 and 500,000 miles");$("life").value=state.settings.lifespan||200000;return}
   state.settings.lifespan=v;saveSettings().then(function(){renderFinds();toast("Lifespan saved")})});
 $("digest").addEventListener("change",function(){state.settings.digest=$("digest").value;saveSettings().then(function(){toast("Report schedule saved")})});
 ["fbCity","clSite"].forEach(function(k){$(k).addEventListener("change",function(){state.settings[k]=slug($(k).value,"pittsburgh");$(k).value=state.settings[k];saveSettings();renderLaunch();renderWatch()})});
+$("clExtra").addEventListener("change",function(){var seen={},list=$("clExtra").value.split(/[,;\s]+/).map(function(x){return slug(x,"")}).filter(function(x){if(!x||seen[x]||x===state.settings.clSite)return false;seen[x]=1;return true});
+  state.settings.clExtra=list.join(", ");$("clExtra").value=state.settings.clExtra;saveSettings();renderLaunch();renderWatch()});
 document.querySelectorAll(".seg button").forEach(function(b){b.addEventListener("click",function(){state.show=b.dataset.show;
   document.querySelectorAll(".seg button").forEach(function(x){x.setAttribute("aria-pressed",x===b?"true":"false")});renderFinds()})});
 $("find-search").addEventListener("change",renderFinds);
 $("find-sort").addEventListener("change",renderFinds);
-$("a-url").addEventListener("input",function(){var u=safeUrl($("a-url").value.trim());var n=u?siteOf(u):"";
-  $("a-site").textContent=n?("Looks like a link from "+n+"."):"Works with links from any car site."});
+$("a-url").addEventListener("input",function(){var u=safeUrl($("a-url").value.trim());var n=u?DF.siteOf(u):"";
+  var dup=u?DF.findByUrl(state.finds,u):null;
+  $("a-site").textContent=dup?("Already in Finds"+(dup.status==="hidden"?" (in Hidden)":"")+": "+(dup.title||"this listing")+"."):n?("Looks like a link from "+n+"."):"Works with links from any car site.";
+  var v=u?DF.findVin(u):"";if(v&&!$("a-vin").value.trim()){$("a-vin").value=v;vinOut("Found a VIN in the link. Choose Look up to fill in the details.")}});
 $("add").addEventListener("submit",function(e){e.preventDefault();
   var href=safeUrl($("a-url").value.trim());if(!href){toast("That link does not look right. Paste the full address starting with https://");return}
+  var dup=DF.findByUrl(state.finds,href);
+  if(dup){toast("That listing is already in Finds"+(dup.status==="hidden"?", under Hidden.":"."));return}
+  var vin=DF.cleanVin($("a-vin").value);if(vin&&!DF.checkVin(vin).ok){toast("A VIN is 17 letters and numbers, without I, O or Q.");return}
   var host="";try{host=new URL(href).hostname}catch(x){}
-  var site=siteOf(href);var t=$("a-title").value.trim()||guessTitle(href)||("Listing from "+site);var ym=(t+" "+href).match(/\b(19[5-9]\d|20[0-3]\d)\b/);
-  putDoc("finds",uid(),{url:href,title:t,price:num($("a-price").value),miles:num($("a-miles").value),year:ym?Number(ym[1]):null,
-    source:/facebook\.com$/.test(host)?"facebook":/craigslist\.org$/.test(host)?"craigslist":"manual",sourceName:site,titleStatus:$("a-tstatus").value||detectTitle(t),searchId:$("a-search").value||"",status:"saved",foundAt:Date.now()})
-  .then(function(){$("add").reset();toast("Added to Finds")})});
+  var site=DF.siteOf(href);var t=$("a-title").value.trim()||DF.guessTitle(href)||("Listing from "+site);var ym=(t+" "+href).match(/\b(19[5-9]\d|20[0-3]\d)\b/);
+  var price=num($("a-price").value),now=Date.now();
+  var vr=vinResult&&vinResult.vin===vin?vinResult:null;
+  putDoc("finds",uid(),{url:href,title:t,price:price,miles:num($("a-miles").value),year:vr&&vr.year?vr.year:(ym?Number(ym[1]):null),
+    source:/facebook\.com$/.test(host)?"facebook":/craigslist\.org$/.test(host)?"craigslist":"manual",sourceName:site,titleStatus:$("a-tstatus").value||DF.detectTitle(t),
+    searchId:$("a-search").value||"",stage:$("a-stage").value||"",vin:vin,specs:vr?vr.specs:"",recalls:vr?vr.recalls:null,
+    priceHistory:price!=null?[{price:price,at:now}]:[],status:"saved",foundAt:now})
+  .then(function(){$("add").reset();vinResult=null;vinOut("Fills in the year, make, model and engine, and checks recalls, using free NHTSA data.");$("a-site").textContent="Works with links from any car site.";toast("Added to Finds")})});
+
+/* ---------- search everything ---------- */
+var ACCESS="driveway-finds-access";
+function accessCode(){try{return localStorage.getItem(ACCESS)||""}catch(e){return ""}}
+function photo(src,cls){var i=document.createElement("img");i.src=src;i.alt="";i.loading="lazy";i.decoding="async";i.referrerPolicy="no-referrer";if(cls)i.className=cls;
+  i.addEventListener("error",function(){i.remove()});return i}
+function workerBase(){var u=safeUrl(state.settings.workerUrl||"");return u&&/^https:/.test(u)?u.replace(/\/+$/,""):""}
+/* Calls the Worker. Resolves its JSON or rejects with a sentence a person can act on. */
+function callWorker(path,params){
+  var base=workerBase();if(!base)return Promise.reject(new Error("Set up your search server first, on the Watchlist tab."));
+  var ctl=typeof AbortController!=="undefined"?new AbortController():null;var t=setTimeout(function(){if(ctl)ctl.abort()},30000);
+  return fetch(base+path+(params?"?"+params.toString():""),{headers:{"X-Access-Code":accessCode()},signal:ctl?ctl.signal:undefined})
+    .then(function(r){clearTimeout(t);return r.json().catch(function(){return {}}).then(function(j){
+      if(r.ok)return j;
+      var why={wrong_access_code:"The access code doesn't match the one on your search server.",access_code_not_set:"Your search server has no ACCESS_CODE secret yet.",
+        origin_not_allowed:"Your search server doesn't allow this page's address. Add it to ALLOWED_ORIGINS.",no_vehicle:"Enter at least one make or model first."}[j.error];
+      throw new Error(why||j.message||("The search server answered with an error ("+r.status+")."))})},
+    function(e){clearTimeout(t);throw new Error(e&&e.name==="AbortError"?"The search took too long. Try again.":"Couldn't reach your search server. Check its address.")})}
+function runSearchAll(){
+  var c=readForm();
+  if(!vlist(c).length){toast("Enter at least one make or model first.");$("vehicles").focus();return}
+  if(!workerBase()){toast("Set up Search everything on the Watchlist tab first.");location.hash="watchlist";setTimeout(function(){$("workerUrl").focus()},50);return}
+  var p=new URLSearchParams();["vehicles","yearMin","yearMax","priceMin","priceMax","milesMax","zip","dist","kw"].forEach(function(k){if(c[k])p.set(k,c[k])});
+  var b=$("search-all");b.disabled=true;b.textContent="Searching…";
+  state.results={loading:true,title:title(c)};renderResults();
+  callWorker("/search",p).then(function(j){state.results={title:title(c),list:j.results||[],sources:j.sources||[],enabled:j.enabled||[],cached:!!j.cached,at:j.at||Date.now()}},
+    function(e){state.results={title:title(c),error:e.message}})
+  .then(function(){b.disabled=false;b.textContent="Search everything, show results here";renderResults();$("results").scrollIntoView({behavior:"smooth",block:"start"})})}
+function renderResults(){
+  var r=state.results,sec=$("results");sec.hidden=!r;if(!r)return;
+  var list=$("r-list"),st=$("r-status");list.textContent="";st.textContent="";
+  if(r.loading){$("r-head").textContent="Searching for "+r.title+"…";return}
+  if(r.error){$("r-head").textContent="Results";var e=el("div","empty");e.appendChild(el("strong",null,"Search didn't run"));e.appendChild(document.createTextNode(r.error));list.appendChild(e);return}
+  $("r-head").textContent=r.list.length+(r.list.length===1?" result":" results")+" for "+r.title;
+  if(!r.enabled.length)st.appendChild(el("span","pill warn","No sources have keys yet. Add them to your search server."));
+  r.sources.forEach(function(s){var p=el("span","pill "+(s.ok?"fb":"warn"),s.name+": "+(s.ok?s.count:"failed"));if(s.error)p.title=s.error;st.appendChild(p)});
+  if(r.cached)st.appendChild(el("span","pill fb","Saved copy from the last 15 minutes"));
+  r.sources.filter(function(s){return !s.ok}).forEach(function(s){var d=el("div","note",s.name+": "+s.error);d.style.flexBasis="100%";d.style.margin="0";st.appendChild(d)});
+  var sort=$("r-sort").value,rows=r.list.slice();
+  var key={price:function(x){return num(x.price)==null?1e12:num(x.price)},miles:function(x){return num(x.miles)==null?1e12:num(x.miles)},
+    cpm:function(x){var v=cpm(x);return v==null?1e12:v},new:function(x){return -(x.listedAt||0)}}[sort]||function(){return 0};
+  rows.sort(function(a,b){return key(a)-key(b)});
+  if(!rows.length){var e2=el("div","empty");e2.appendChild(el("strong",null,"Nothing matched"));e2.appendChild(document.createTextNode("Try a wider distance, a higher price, or fewer filters."));list.appendChild(e2);return}
+  rows.forEach(function(x){list.appendChild(resultCard(x))});
+}
+function resultCard(x){
+  var card=el("article","rc");var href=safeUrl(x.url);
+  var ph=el("div","ph");var src=safeUrl(x.photo);if(src)ph.appendChild(photo(src));else ph.textContent="No photo";card.appendChild(ph);
+  var bd=el("div","bd");
+  bd.appendChild(el("div","price",money(num(x.price))||"No price"));
+  bd.appendChild(el("h3",null,x.title||"Listing"));
+  var bits=[];if(num(x.miles)!=null)bits.push(Number(x.miles).toLocaleString("en-US")+" mi");if(x.location)bits.push(x.location);if(num(x.distance)!=null)bits.push(Math.round(x.distance)+" mi away");
+  if(bits.length)bd.appendChild(el("div","meta",bits.join("  ·  ")));
+  var pills=el("div","row");pills.appendChild(el("span","pill fb",x.source));
+  if(x.sellerType==="private")pills.appendChild(el("span","pill good","Private seller"));
+  if(x.listedAt&&Date.now()-x.listedAt<2*864e5)pills.appendChild(el("span","pill new","New"));
+  var ts=DF.detectTitle(x.title);if(ts)pills.appendChild(el("span","pill bad",ts==="salvage"?"Salvage title":"Rebuilt title"));
+  var cp=cpm(x);if(cp!=null)pills.appendChild(el("span","pill fb","$"+cp.toFixed(2)+"/remaining mi"));
+  bd.appendChild(pills);
+  var act=el("div","actions");
+  if(href)act.appendChild(link("btn sm go","Open listing",href));
+  (x.also||[]).forEach(function(a){var u=safeUrl(a.url);if(u)act.appendChild(link("btn sm","Also on "+a.source,u))});
+  var have=href?DF.findByUrl(state.finds,href):null;
+  var sv=btn("btn sm",have?"In Finds":"Save to Finds",function(){
+    if(!href||DF.findByUrl(state.finds,href)){toast("Already in Finds.");return}
+    var now=Date.now(),price=num(x.price);
+    putDoc("finds",uid(),{url:href,title:x.title||"Listing",price:price,miles:num(x.miles),year:num(x.year),vin:DF.checkVin(x.vin||"").ok?DF.cleanVin(x.vin):"",
+      photo:src||"",location:x.location||"",source:"search",sourceName:x.source,sellerType:x.sellerType||"",titleStatus:DF.detectTitle(x.title),
+      searchId:"",stage:"",specs:"",recalls:null,priceHistory:price!=null?[{price:price,at:now}]:[],status:"saved",foundAt:now})
+    .then(function(){sv.textContent="In Finds";sv.disabled=true;toast("Saved to Finds")})});
+  if(have)sv.disabled=true;act.appendChild(sv);
+  bd.appendChild(act);card.appendChild(bd);return card}
+$("search-all").addEventListener("click",runSearchAll);
+$("r-sort").addEventListener("change",renderResults);
+$("workerUrl").addEventListener("change",function(){var v=$("workerUrl").value.trim();var u=v?safeUrl(v):"";
+  if(v&&(!u||!/^https:/.test(u))){toast("The address should start with https://");return}
+  state.settings.workerUrl=u?u.replace(/\/+$/,""):"";$("workerUrl").value=state.settings.workerUrl;saveSettings();toast("Search server saved")});
+$("accessCode").addEventListener("change",function(){try{localStorage.setItem(ACCESS,$("accessCode").value)}catch(e){}toast("Access code saved on this device")});
+$("test-worker").addEventListener("click",function(){var out=$("worker-out");out.textContent="Checking…";
+  var p=new URLSearchParams({vehicles:"Toyota Camry",zip:/^\d{5}$/.test($("zip").value)?$("zip").value:""});
+  callWorker("/search",p).then(function(j){var en=j.enabled||[];out.textContent=en.length?("Connected. Sources with keys: "+en.join(", ")+". A test search found "+(j.results||[]).length+" listings."):"Connected, but no sources have keys yet. Add at least one key to your search server."},
+    function(e){out.textContent=e.message})});
+
+/* ---------- backup ---------- */
+$("export").addEventListener("click",function(){
+  var data=JSON.stringify(DF.makeBackup(state),null,1);var name="driveway-finds-backup-"+new Date().toISOString().slice(0,10)+".json";
+  try{var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([data],{type:"application/json"}));a.download=name;document.body.appendChild(a);a.click();
+    setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},1000);toast("Backup downloaded")}catch(e){toast("This viewer blocked the download.")}});
+$("import").addEventListener("change",function(){var file=$("import").files[0];$("import").value="";if(!file)return;
+  if(file.size>15*1024*1024){toast("That file is too big to be a backup.");return}
+  file.text().then(function(text){var b;try{b=DF.readBackup(text)}catch(e){toast(e.message);return}
+    var plan=DF.mergePlan(state,b);
+    if(!plan.searches.length&&!plan.finds.length){toast("Nothing new in that backup. Everything is already here.");return}
+    if(!db){state.searches=state.searches.concat(plan.searches);state.finds=state.finds.concat(plan.finds);saveLocal();renderAll();done();return}
+    Promise.all(plan.searches.map(function(s){var d=Object.assign({},s);delete d.id;return db.doc("searches/"+s.id).set(d)})
+      .concat(plan.finds.map(function(f){var d=Object.assign({},f);delete d.id;return db.doc("finds/"+f.id).set(d)}))).then(done,fail);
+    function done(){toast("Restored "+plan.searches.length+" searches and "+plan.finds.length+" finds"+(plan.skipped?". Skipped "+plan.skipped+" already here.":"."))}})});
 
 /* ---------- tabs ---------- */
 function route(){var h=(location.hash||"").replace("#","");if(["search","watchlist","finds"].indexOf(h)<0)h="search";
@@ -554,18 +749,19 @@ function route(){var h=(location.hash||"").replace("#","");if(["search","watchli
 window.addEventListener("hashchange",route);
 
 /* ---------- start ---------- */
-fillForm(EXAMPLE);loadLocal();route();renderAll();
+fillStages($("a-stage"),"");try{$("accessCode").value=accessCode()}catch(e){}
+fillForm(Object.assign(blank(),loadDraft()||EXAMPLE));loadLocal();route();renderAll();
 
 function rows(snap){return snap.docs.map(function(d){return Object.assign({id:d.id},d.data())})}
 function connect(){
   if(!window.claude||typeof window.claude.use!=="function")return;
   window.claude.use("db").then(function(ns){
-    if(!ns)return;db=ns;
+    if(!ns)return;db=ns;renderSettings();
     var slow=setTimeout(function(){toast("Your saved data is taking a while to load.")},10000);
     var clear=function(){clearTimeout(slow)};
     db.collection("searches").onSnapshot(function(s){clear();state.searches=rows(s);renderSelects();renderWatch();renderFinds()},clear);
     db.collection("finds").onSnapshot(function(s){clear();state.finds=rows(s);renderWatch();renderFinds()},clear);
-    db.doc("settings/main").onSnapshot(function(d){if(d.exists){state.settings=Object.assign({fbCity:"pittsburgh",clSite:"pittsburgh",digest:"daily",lifespan:200000},d.data());renderSettings();renderLaunch();renderWatch()}},function(){});
+    db.doc("settings/main").onSnapshot(function(d){if(d.exists){state.settings=Object.assign({},DEFAULT_SETTINGS,d.data());renderSettings();renderLaunch();renderWatch()}},function(){});
     db.doc("settings/status").onSnapshot(function(d){state.status=d.exists?d.data():null;renderSettings()},function(){});
   }).catch(function(){});
 }
