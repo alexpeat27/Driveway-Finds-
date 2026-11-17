@@ -51,7 +51,7 @@ From this repo on a computer with Node.js:
 cd worker
 npx wrangler login
 npx wrangler deploy
-npx wrangler secret put ACCESS_CODE
 ```
 
-Repeat `npx wrangler secret put` for each key name in step 3.
+`wrangler.toml` sets `keep_vars = true`, so a deploy keeps the secrets and settings added in the dashboard.
+Add a secret from the command line with `npx wrangler secret put ACCESS_CODE` (or any key name in step 3).
