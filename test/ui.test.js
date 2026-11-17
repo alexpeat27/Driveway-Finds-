@@ -24,23 +24,29 @@ test("page works end to end", { skip: !chromium && "playwright is not installed"
   try {
     await page.goto(PAGE);
 
-    // Launch panel: buttons for every site, and the skipped-filter note.
+    // One Search button; no site links remain.
+    for (const gone of ["#fb-links", "#cl-links", "#at-links", "#more-links", "#skipped", "#fbCity", "#clSite", "#digest"]) assert.equal(await page.locator(gone).count(), 0, gone);
+    assert.equal(await page.textContent("#search-all"), "Search");
     await page.fill("#vehicles", "Land Rover Defender");
-    await page.selectOption("#cyl", "5");
-    const at = await page.getAttribute("#at-links a", "href");
-    assert.match(at, /make=landrover&model=defender/);
-    assert.equal(await page.locator("#more-links a").count(), 2);
-    assert.match(await page.textContent("#skipped"), /Facebook: .*cylinders/);
+    await page.selectOption("#cyl", "8");
+    assert.match(await page.textContent("#chips"), /8 cyl/);
 
     // The form survives a reload.
     await page.reload();
     assert.equal(await page.inputValue("#vehicles"), "Land Rover Defender");
+    assert.equal(await page.inputValue("#cyl"), "8");
+
+    // An old saved draft in the previous format is translated.
+    await page.evaluate(() => localStorage.setItem("driveway-finds-draft", JSON.stringify({ vehicles: "Ford", body: "7", drive: "3", cyl: "4", dist: "75" })));
+    await page.reload();
+    assert.deepEqual([await page.inputValue("#body"), await page.inputValue("#drive"), await page.inputValue("#cyl"), await page.inputValue("#dist")], ["pickup", "4wd", "6", "100"]);
+    await page.fill("#vehicles", "Land Rover Defender");
 
     // Flagging the same search twice keeps one.
     await page.click("#flag");
     await page.click("#flag");
     assert.equal(await page.textContent("#n-watch"), "1");
-    assert.match(await page.textContent("#toast"), /already on the Watchlist/);
+    assert.match(await page.textContent("#toast"), /already saved on the Watchlist/);
 
     // Add a listing with a VIN lookup.
     await page.goto(PAGE + "#finds");
@@ -170,6 +176,9 @@ test("Search everything shows merged results with photos and saves to Finds", { 
     const q = new URL(seen[seen.length - 1].url).searchParams;
     assert.equal(q.get("vehicles"), "Toyota Tacoma");
     assert.equal(q.get("priceMax"), "22000");
+    assert.equal(q.get("body"), "pickup");
+    assert.equal(q.get("drive"), "4wd");
+    assert.equal(q.get("dist"), "any");
     assert.match(await page.textContent("#r-head"), /2 results for Toyota Tacoma/);
     assert.match(await page.textContent("#r-status"), /Auto\.dev: failed/);
     assert.match(await page.textContent("#r-status"), /free allowance used up/);
@@ -187,6 +196,21 @@ test("Search everything shows merged results with photos and saves to Finds", { 
     await page.goto(PAGE + "#finds");
     assert.match(await page.locator("#find-list .item").first().textContent(), /Private seller/);
     assert.match(await page.locator("#find-list .item").first().textContent(), /MarketCheck \(private seller\)/);
+
+    // Pressing Enter in the form runs the search too.
+    await page.goto(PAGE + "#search");
+    const before = seen.length;
+    await page.press("#vehicles", "Enter");
+    await page.waitForFunction(() => document.querySelectorAll("#r-list .rc").length === 2);
+    assert.ok(seen.length > before);
+
+    // A saved search runs from the Watchlist with one click.
+    await page.click("#flag");
+    await page.goto(PAGE + "#watchlist");
+    const n0 = seen.length;
+    await page.locator("#watch-list").getByRole("button", { name: "Run search" }).click();
+    await page.waitForFunction(() => location.hash === "#search" && document.querySelectorAll("#r-list .rc").length === 2);
+    assert.ok(seen.length > n0);
 
     // Phone width: the results grid does not scroll sideways.
     await page.setViewportSize({ width: 375, height: 800 });
