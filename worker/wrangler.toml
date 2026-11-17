@@ -1,6 +1,16 @@
 name = "driveway-finds"
 main = "src/index.js"
-compatibility_date = "2026-11-01"
+compatibility_date = "2026-11-17"
 
-# Secrets are not stored here. Add them in the Cloudflare dashboard
-# (Settings > Variables and Secrets) or with: npx wrangler secret put ACCESS_CODE
+# Keep settings added in the Cloudflare dashboard when deploying from here.
+keep_vars = true
+
+# No extra preview addresses; the one workers.dev address is enough.
+preview_urls = false
+
+[vars]
+ALLOWED_ORIGINS = "https://alexpeat27.github.io"
+
+# Secrets (ACCESS_CODE, AUTODEV_KEY, MARKETCHECK_KEY, EBAY_CLIENT_ID, EBAY_CLIENT_SECRET)
+# are not stored here. Add them in the Cloudflare dashboard (Settings > Variables and Secrets)
+# or with: npx wrangler secret put ACCESS_CODE
