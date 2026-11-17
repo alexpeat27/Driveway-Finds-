@@ -552,6 +552,11 @@ $("a-vin").addEventListener("input",function(){vinResult=null});
 
 /* ---------- events ---------- */
 $("f").addEventListener("input",function(){renderLaunch();saveDraft()});
+/* Turn a 2-digit year into 4 digits when the box is left, and swap a backwards range. */
+["yearMin","yearMax"].forEach(function(k){$(k).addEventListener("change",function(){
+  $(k).value=DF.fullYear($(k).value);var a=$("yearMin").value,b=$("yearMax").value;
+  if(a&&b&&Number(a)>Number(b)){$("yearMin").value=b;$("yearMax").value=a}
+  renderLaunch();saveDraft()})});
 $("f").addEventListener("submit",function(e){e.preventDefault();runSearchAll()});
 $("f").addEventListener("keydown",function(e){if(e.key==="Enter"&&e.target.tagName==="INPUT"){e.preventDefault();runSearchAll()}});
 $("clear").addEventListener("click",function(){fillForm(blank());saveDraft();renderLaunch()});
@@ -627,7 +632,7 @@ function renderResults(){
   var key={price:function(x){return num(x.price)==null?1e12:num(x.price)},miles:function(x){return num(x.miles)==null?1e12:num(x.miles)},
     cpm:function(x){var v=cpm(x);return v==null?1e12:v},new:function(x){return -(x.listedAt||0)}}[sort]||function(){return 0};
   rows.sort(function(a,b){return key(a)-key(b)});
-  if(!rows.length){var e2=el("div","empty");e2.appendChild(el("strong",null,"Nothing matched"));e2.appendChild(document.createTextNode("Try a wider distance, a higher price, or fewer filters."));list.appendChild(e2);return}
+  if(!rows.length){var e2=el("div","empty");e2.appendChild(el("strong",null,"Nothing matched"));e2.appendChild(document.createTextNode("Try a wider distance, a higher price, more years, or fewer filters. Check the model's spelling too, e.g. S-10, F-150."));list.appendChild(e2);return}
   rows.forEach(function(x){list.appendChild(resultCard(x))});
 }
 function resultCard(x){

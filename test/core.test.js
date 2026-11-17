@@ -54,6 +54,11 @@ test("old saved searches are translated, new ones are left alone", () => {
   assert.equal(DF.title({ fmt: 2, body: "minivan" }), "Any Minivan");
 });
 
+test("fullYear turns two digits into a year", () => {
+  const now = new Date("2026-11-17");
+  assert.deepEqual(["01", "85", "27", "28", "2019", "", "abc"].map((v) => DF.fullYear(v, now)), ["2001", "1985", "2027", "1928", "2019", "", "abc"]);
+});
+
 test("price history records only real changes", () => {
   let h = DF.withPrice([], 20000, 18500, 1);
   assert.deepEqual(h, [{ price: 20000, at: 1 }, { price: 18500, at: 1 }]);

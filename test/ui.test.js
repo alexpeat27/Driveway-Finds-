@@ -31,6 +31,13 @@ test("page works end to end", { skip: !chromium && "playwright is not installed"
     await page.selectOption("#cyl", "8");
     assert.match(await page.textContent("#chips"), /8 cyl/);
 
+    // A two-digit year becomes four digits, and a backwards range is swapped.
+    await page.fill("#yearMin", "2010");
+    await page.fill("#yearMax", "01");
+    await page.dispatchEvent("#yearMax", "change");
+    assert.deepEqual([await page.inputValue("#yearMin"), await page.inputValue("#yearMax")], ["2001", "2010"]);
+    assert.match(await page.textContent("#chips"), /2001 to 2010/);
+
     // The form survives a reload.
     await page.reload();
     assert.equal(await page.inputValue("#vehicles"), "Land Rover Defender");
