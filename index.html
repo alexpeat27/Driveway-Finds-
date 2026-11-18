@@ -71,7 +71,12 @@ input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible{ou
 .btn.quiet{border-color:var(--line);color:var(--muted);font-weight:500}
 .stack{display:flex;flex-direction:column;gap:10px}
 .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.launch{position:sticky;top:16px}
+.side{display:flex;flex-direction:column;gap:16px;align-self:stretch}
+.hero{position:relative;flex:1;min-height:240px;margin:0;border-radius:var(--r);overflow:hidden;border:1px solid var(--line);background:var(--sunk)}
+.hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:45% 50%;display:block}
+.hero figcaption{position:absolute;left:0;right:0;bottom:0;padding:18px 12px 8px;font-size:11px;color:#f1f1f1;
+  background:linear-gradient(transparent,rgba(0,0,0,.72))}
+.hero figcaption a{color:#fff}
 .plate{font-family:var(--display);font-size:26px;font-weight:700;text-transform:uppercase;line-height:1.1;margin:2px 0 10px;overflow-wrap:anywhere}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
 .chip{background:var(--sunk);border-radius:20px;padding:3px 10px;font-size:13px;font-variant-numeric:tabular-nums}
@@ -144,7 +149,7 @@ ul.checks{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:5px
 .thumb{width:120px;aspect-ratio:4/3;object-fit:cover;border-radius:7px;background:var(--sunk);display:block;margin-bottom:8px}
 @media (max-width:820px){
   .bench,.cols{grid-template-columns:1fr}
-  .launch{position:static}
+  .hero{flex:none;aspect-ratio:3/2;min-height:0}
   nav.tabs{margin-left:0;width:100%}
   nav.tabs a{flex:1;justify-content:center;padding:9px 6px 8px;font-size:18px}
   .brand h1{font-size:28px}
@@ -229,6 +234,7 @@ ul.checks{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:5px
         </div>
       </form>
 
+      <div class="side">
       <aside class="card launch" aria-live="polite">
         <div class="legend">Your search</div>
         <div class="plate" id="plate">Any vehicle</div>
@@ -239,6 +245,11 @@ ul.checks{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:5px
         </div>
         <p class="note" id="search-note">Searches dealer and private-seller listings from every source connected to your search server, and shows them below with photos.</p>
       </aside>
+      <figure class="hero">
+        <img src="assets/family-huckster.jpg" width="720" height="480" alt="Travis Pastrana's Subaru GL Wagon 'Family Huckster', white with Subaru and Hoonigan livery, headlights on, driving between hay bales at the Goodwood Festival of Speed" decoding="async">
+        <figcaption>Subaru GL “Family Huckster”, Goodwood 2023. Photo: <a href="https://commons.wikimedia.org/wiki/File:Subaru_GL_Wagon_%27Family_Huckster%27_(53257977923).jpg" target="_blank" rel="noopener">Neil</a>, <a href="https://creativecommons.org/licenses/by/2.0/" target="_blank" rel="noopener">CC BY 2.0</a>, cropped.</figcaption>
+      </figure>
+      </div>
     </div>
     <section class="results" id="results" hidden aria-live="polite">
       <div class="bar">
