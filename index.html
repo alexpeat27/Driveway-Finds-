@@ -130,6 +130,17 @@ details.more .stack{margin-top:8px}
 .rc .price{font-size:24px}
 .rc .meta{margin:0}
 .rc .actions{margin-top:auto;padding-top:6px}
+.r-group{margin-bottom:26px}
+.r-sub{font-size:21px;text-transform:uppercase;margin:0 0 4px}
+.r-group .note{margin:0 0 12px}
+.r-group.best .r-sub{color:var(--good)}
+.rc.exact{border:2px solid var(--good);box-shadow:0 0 0 1px var(--good-bg)}
+ul.checks{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:5px}
+.chk{font-size:12px;font-weight:600;border-radius:5px;padding:2px 7px;border:1px solid transparent}
+.chk .mk{font-weight:700}
+.chk.yes{background:var(--good-bg);color:var(--good)}
+.chk.no{background:transparent;color:var(--accent);border-color:var(--accent)}
+.chk.unk{background:var(--sunk);color:var(--muted)}
 .thumb{width:120px;aspect-ratio:4/3;object-fit:cover;border-radius:7px;background:var(--sunk);display:block;margin-bottom:8px}
 @media (max-width:820px){
   .bench,.cols{grid-template-columns:1fr}
@@ -221,10 +232,10 @@ details.more .stack{margin-top:8px}
     <section class="results" id="results" hidden aria-live="polite">
       <div class="bar">
         <h2 id="r-head">Results</h2>
-        <select id="r-sort" aria-label="Sort results"><option value="new">Newest first</option><option value="price">Lowest price</option><option value="miles">Lowest miles</option><option value="cpm">Lowest cost per remaining mile</option></select>
+        <select id="r-sort" aria-label="Sort results"><option value="match">Best match</option><option value="new">Newest first</option><option value="price">Lowest price</option><option value="miles">Lowest miles</option><option value="cpm">Lowest cost per remaining mile</option></select>
       </div>
       <div class="r-status" id="r-status"></div>
-      <div class="grid-cards" id="r-list"></div>
+      <div id="r-list"></div>
     </section>
   </section>
 
@@ -623,26 +634,39 @@ function renderResults(){
   var list=$("r-list"),st=$("r-status");list.textContent="";st.textContent="";
   if(r.loading){$("r-head").textContent="Searching for "+r.title+"…";return}
   if(r.error){$("r-head").textContent="Results";var e=el("div","empty");e.appendChild(el("strong",null,"Search didn't run"));e.appendChild(document.createTextNode(r.error));list.appendChild(e);return}
-  $("r-head").textContent=r.list.length+(r.list.length===1?" result":" results")+" for "+r.title;
+  /* Responses from before match grading have no "exact" field; treat those as exact. */
+  var exact=r.list.filter(function(x){return x.exact!==false}),other=r.list.filter(function(x){return x.exact===false});
+  $("r-head").textContent=!r.list.length?"No results for "+r.title:exact.length?(exact.length+(exact.length===1?" best match":" best matches")+(other.length?", "+other.length+" close":"")+" for "+r.title):("No exact matches, "+other.length+" close for "+r.title);
   if(!r.enabled.length)st.appendChild(el("span","pill warn","No sources have keys yet. Add them to your search server."));
   r.sources.forEach(function(s){var p=el("span","pill "+(s.ok?"fb":"warn"),s.name+": "+(s.ok?s.count:"failed"));if(s.error)p.title=s.error;st.appendChild(p)});
   if(r.cached)st.appendChild(el("span","pill fb","Saved copy from the last 15 minutes"));
   r.sources.filter(function(s){return !s.ok}).forEach(function(s){var d=el("div","note",s.name+": "+s.error);d.style.flexBasis="100%";d.style.margin="0";st.appendChild(d)});
-  var sort=$("r-sort").value,rows=r.list.slice();
+  if(!r.list.length){var e2=el("div","empty");e2.appendChild(el("strong",null,"Nothing found"));e2.appendChild(document.createTextNode("No listings for this make and model in this area. Try a wider distance, or check the model's spelling, e.g. S-10, F-150."));list.appendChild(e2);return}
+  var sort=$("r-sort").value;
   var key={price:function(x){return num(x.price)==null?1e12:num(x.price)},miles:function(x){return num(x.miles)==null?1e12:num(x.miles)},
-    cpm:function(x){var v=cpm(x);return v==null?1e12:v},new:function(x){return -(x.listedAt||0)}}[sort]||function(){return 0};
-  rows.sort(function(a,b){return key(a)-key(b)});
-  if(!rows.length){var e2=el("div","empty");e2.appendChild(el("strong",null,"Nothing matched"));e2.appendChild(document.createTextNode("Try a wider distance, a higher price, more years, or fewer filters. Check the model's spelling too, e.g. S-10, F-150."));list.appendChild(e2);return}
-  rows.forEach(function(x){list.appendChild(resultCard(x))});
+    cpm:function(x){var v=cpm(x);return v==null?1e12:v},new:function(x){return -(x.listedAt||0)}}[sort];
+  /* "Best match" keeps the server's order: fewest missed filters, then nearest year. */
+  function ordered(rows){rows=rows.slice();if(key)rows.sort(function(a,b){return key(a)-key(b)});return rows}
+  function group(title,sub,rows,cls){var g=el("section","r-group "+cls);var h=el("h3","r-sub",title);g.appendChild(h);if(sub)g.appendChild(el("p","note",sub));
+    var grid=el("div","grid-cards");ordered(rows).forEach(function(x){grid.appendChild(resultCard(x))});g.appendChild(grid);list.appendChild(g)}
+  if(exact.length)group("Best matches ("+exact.length+")",null,exact,"best");
+  else{var none=el("div","empty");none.appendChild(el("strong",null,"No exact matches"));none.appendChild(document.createTextNode("Nothing meets every filter. These are the closest, with the filters each one misses marked ✗."));list.appendChild(none)}
+  if(other.length)group("Other results ("+other.length+")",exact.length?"Close, but each one misses at least one filter. ✓ meets it, ✗ misses it, ? the listing doesn't say.":"✓ meets the filter, ✗ misses it, ? the listing doesn't say.",other,"others");
 }
 function resultCard(x){
-  var card=el("article","rc");var href=safeUrl(x.url);
+  var card=el("article","rc"+(x.exact===false?"":" exact"));var href=safeUrl(x.url);
   var ph=el("div","ph");var src=safeUrl(x.photo);if(src)ph.appendChild(photo(src));else ph.textContent="No photo";card.appendChild(ph);
   var bd=el("div","bd");
   bd.appendChild(el("div","price",money(num(x.price))||"No price"));
   bd.appendChild(el("h3",null,x.title||"Listing"));
   var bits=[];if(num(x.miles)!=null)bits.push(Number(x.miles).toLocaleString("en-US")+" mi");if(x.location)bits.push(x.location);if(num(x.distance)!=null)bits.push(Math.round(x.distance)+" mi away");
   if(bits.length)bd.appendChild(el("div","meta",bits.join("  ·  ")));
+  /* Which filters this car meets. Exact matches list only what the listing doesn't state. */
+  var checks=(x.checks||[]).filter(function(c){return x.exact===false||c.ok==null});
+  if(checks.length){var cr=el("ul","checks");cr.setAttribute("aria-label","Filters");
+    checks.forEach(function(c){var li=el("li","chk "+(c.ok===true?"yes":c.ok===false?"no":"unk"));
+      li.appendChild(el("span","mk",c.ok===true?"✓":c.ok===false?"✗":"?"));li.appendChild(document.createTextNode(" "+c.label));
+      li.title=c.ok===true?"Meets this filter":c.ok===false?"Doesn't meet this filter":"The listing doesn't say";cr.appendChild(li)});bd.appendChild(cr)}
   var pills=el("div","row");pills.appendChild(el("span","pill fb",x.source));
   if(x.sellerType==="private")pills.appendChild(el("span","pill good","Private seller"));
   if(x.listedAt&&Date.now()-x.listedAt<2*864e5)pills.appendChild(el("span","pill new","New"));
@@ -651,7 +675,9 @@ function resultCard(x){
   bd.appendChild(pills);
   var act=el("div","actions");
   if(href)act.appendChild(link("btn sm go","Open listing",href));
-  (x.also||[]).forEach(function(a){var u=safeUrl(a.url);if(u)act.appendChild(link("btn sm","Also on "+a.source,u))});
+  /* One "Also on" link per other site; repeat listings on the same site are left out. */
+  var shown={};shown[x.source]=1;
+  (x.also||[]).forEach(function(a){var u=safeUrl(a.url);if(u&&!shown[a.source]){shown[a.source]=1;act.appendChild(link("btn sm","Also on "+a.source,u))}});
   var have=href?DF.findByUrl(state.finds,href):null;
   var sv=btn("btn sm",have?"In Finds":"Save to Finds",function(){
     if(!href||DF.findByUrl(state.finds,href)){toast("Already in Finds.");return}

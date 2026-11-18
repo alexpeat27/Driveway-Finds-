@@ -69,16 +69,22 @@ test("only listed page addresses may call it when ALLOWED_ORIGINS is set", async
   assert.match(pre.headers.get("Access-Control-Allow-Headers"), /X-Access-Code/);
 });
 
-test("searches every source, merges the same car, drops out-of-range results", async () => {
+test("searches every source, merges the same car, grades out-of-range results", async () => {
   mock();
   const r = await W.default.fetch(req("vehicles=Toyota+Tacoma&yearMin=2012&yearMax=2019&priceMax=22000&milesMax=100000&zip=15222&dist=50"), ENV);
   assert.equal(r.status, 200);
   const body = await r.json();
-  assert.deepEqual(body.sources.map((s) => [s.name, s.ok, s.count]), [
-    ["MarketCheck", true, 2], ["MarketCheck private sellers", true, 1], ["Auto.dev", true, 2], ["eBay Motors", true, 1],
+  assert.deepEqual(body.sources.map((s) => [s.name, s.ok]), [
+    ["MarketCheck", true], ["MarketCheck private sellers", true], ["Auto.dev", true], ["eBay Motors", true],
   ]);
-  // 6 raw results: the 2020 truck is out of range and the VIN 1M8... appears twice, so 4 remain.
-  assert.equal(body.results.length, 4);
+  // 6 raw results, the VIN 1M8... twice, so 5 cars. The 2020 truck is kept but graded as missing the year and price.
+  assert.equal(body.results.length, 5);
+  assert.equal(body.results.filter((x) => x.exact).length, 4);
+  const late = body.results[body.results.length - 1];
+  assert.equal(late.exact, false, "non-matches come last");
+  assert.deepEqual(late.checks.map((c) => [c.key, c.ok]), [["year", false], ["price", false], ["miles", true]]);
+  // Fewer than 10 exact matches, so looser searches ran (years widened, price and miles dropped).
+  assert.ok(body.widened);
   const dup = body.results.find((x) => x.vin === "1M8GDM9AXKP042788");
   assert.equal(dup.source, "MarketCheck", "the copy with photos wins");
   assert.equal(dup.photo, "https://img.example/a1.jpg");
@@ -172,7 +178,14 @@ test("vehicle filters go to Auto.dev and every result is re-checked", async () =
   assert.equal(p.get("vehicle.bodyStyle"), "Truck,Pickup");
   assert.equal(p.get("vehicle.drivetrain"), "4WD");
   assert.equal(p.get("vehicle.transmission"), "Manual");
-  assert.deepEqual(body.results.map((x) => x.url).sort(), ["https://d.example/keep", "https://d.example/unstated"]);
+  const exact = body.results.filter((x) => x.exact).map((x) => x.url).sort();
+  assert.deepEqual(exact, ["https://d.example/keep", "https://d.example/unstated"]);
+  const misses = (u) => body.results.find((x) => x.url === u).checks.filter((c) => c.ok === false).map((c) => c.key);
+  assert.deepEqual(misses("https://d.example/wrong-drive"), ["drive"]);
+  assert.deepEqual(misses("https://d.example/wrong-trans"), ["trans"]);
+  assert.deepEqual(misses("https://d.example/wrong-engine"), ["engine"]);
+  assert.deepEqual(body.results.find((x) => x.url === "https://d.example/unstated").checks.filter((c) => c.ok === null).map((c) => c.key), ["engine", "drive", "body", "trans"]);
+  assert.equal(p.get("vehicle.engine"), "4.0L*");
   const kept = body.results.find((x) => x.url === "https://d.example/keep");
   assert.deepEqual([kept.drive, kept.trans, kept.fuel, kept.cyl, kept.body], ["4wd", "manual", "gas", 6, "pickup"]);
 });
@@ -205,6 +218,34 @@ test("two-digit and backwards years, and model spellings with or without a dash"
   assert.equal(p.get("vehicle.make"), "Chevrolet");
   assert.equal(p.get("vehicle.model"), "s10,s-10");
   assert.equal(p.get("vehicle.year"), "1985-2001");
+});
+
+test("looser searches widen years, then drop specs, then drop price and miles", () => {
+  const c = W.readCriteria(new URLSearchParams("vehicles=chevy tahoe&yearMin=1999&yearMax=1999&engine=5.3&drive=4wd&priceMax=9000"));
+  const v = W.looserSearches(c);
+  assert.equal(v.length, 3);
+  assert.deepEqual([v[0].yearMin, v[0].yearMax, v[0].skipYears, v[0].engine, v[0].drive], [1996, 2002, [1999, 1999], "5.3", "4wd"]);
+  assert.deepEqual([v[1].engine, v[1].drive, v[1].yearMin], ["", "", 1999]);
+  assert.deepEqual([v[2].priceMax, v[2].engine], [null, "5.3"]);
+  assert.equal(W.looserSearches(W.readCriteria(new URLSearchParams("vehicles=ford"))).length, 0);
+});
+
+test("the widened-years search skips the years already searched", async () => {
+  mock();
+  await W.default.fetch(req("vehicles=chevy+tahoe&yearMin=1999&yearMax=1999&engine=5.3&drive=4wd&dist=any"), { ACCESS_CODE: "open sesame", AUTODEV_KEY: "ak" });
+  const years = calls.filter((x) => x.url.includes("api.auto.dev")).map((x) => new URL(x.url).searchParams.get("vehicle.year"));
+  assert.deepEqual(years, ["1999-1999", "1996,1997,1998,2000,2001,2002", "1999-1999"]);
+});
+
+test("ranking: exact first, then fewest misses, then nearest year", () => {
+  const rows = [
+    { exact: false, misses: 2, yearGap: 0, listedAt: 3 },
+    { exact: false, misses: 1, yearGap: 3, listedAt: 2 },
+    { exact: true, misses: 0, yearGap: 0, listedAt: 1 },
+    { exact: false, misses: 1, yearGap: 1, listedAt: 1 },
+  ];
+  rows.sort(W.byMatch);
+  assert.deepEqual(rows.map((r) => [r.exact, r.misses, r.yearGap]), [[true, 0, 0], [false, 1, 1], [false, 1, 3], [false, 2, 0]]);
 });
 
 test("no vehicle is a clear error", async () => {
