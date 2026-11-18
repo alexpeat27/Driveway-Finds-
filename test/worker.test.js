@@ -74,9 +74,8 @@ test("searches every source, merges the same car, grades out-of-range results", 
   const r = await W.default.fetch(req("vehicles=Toyota+Tacoma&yearMin=2012&yearMax=2019&priceMax=22000&milesMax=100000&zip=15222&dist=50"), ENV);
   assert.equal(r.status, 200);
   const body = await r.json();
-  assert.deepEqual(body.sources.map((s) => [s.name, s.ok]), [
-    ["MarketCheck", true], ["MarketCheck private sellers", true], ["Auto.dev", true], ["eBay Motors", true],
-  ]);
+  assert.deepEqual(body.sources.map((s) => s.name).sort(), ["Auto.dev", "MarketCheck", "MarketCheck private sellers", "eBay Motors"]);
+  assert.ok(body.sources.every((s) => s.ok));
   // 6 raw results, the VIN 1M8... twice, so 5 cars. The 2020 truck is kept but graded as missing the year and price.
   assert.equal(body.results.length, 5);
   assert.equal(body.results.filter((x) => x.exact).length, 4);
@@ -246,6 +245,77 @@ test("ranking: exact first, then fewest misses, then nearest year", () => {
   ];
   rows.sort(W.byMatch);
   assert.deepEqual(rows.map((r) => [r.exact, r.misses, r.yearGap]), [[true, 0, 0], [false, 1, 1], [false, 1, 3], [false, 2, 0]]);
+});
+
+test("Show more: page 1 lists sources with more, page 2 runs only those", async () => {
+  // Auto.dev reports 45 in total, so after 20 there is more; eBay reports 1, so it is finished.
+  const page = (n) => Array.from({ length: 20 }, (_, i) => ({ vin: "", vehicle: { year: 2001, make: "Chevrolet", model: "Silverado 1500", style: "Extended Cab Pickup" },
+    retailListing: { price: 9000, miles: 90000, vdp: "https://d.example/p" + n + "-" + i, primaryImage: "https://img.example/x.jpg" } }));
+  mock({
+    "api.auto.dev": (url) => reply({ data: page(new URL(url).searchParams.get("page")), total: 45 }),
+    "item_summary": () => reply({ total: 1, itemSummaries: [{ itemId: "e1", title: "2002 Chevrolet Silverado 1500 Extended Cab", price: { value: "8000" }, itemWebUrl: "https://www.ebay.com/itm/e1", buyingOptions: ["FIXED_PRICE"] }] }),
+  });
+  const env = { ACCESS_CODE: "open sesame", AUTODEV_KEY: "ak", EBAY_CLIENT_ID: "id", EBAY_CLIENT_SECRET: "sec" };
+  const p1 = await (await W.default.fetch(req("vehicles=chevy&body=pickup&yearMin=1994&yearMax=2005&dist=any"), env)).json();
+  assert.equal(p1.page, 1);
+  assert.deepEqual(p1.next, ["0.0.ad"]);
+  assert.equal(p1.sources.find((s) => s.name === "Auto.dev").total, 45);
+  mock({ "api.auto.dev": (url) => reply({ data: page(new URL(url).searchParams.get("page")), total: 45 }) });
+  const p2 = await (await W.default.fetch(req("vehicles=chevy&body=pickup&yearMin=1994&yearMax=2005&dist=any&page=2&jobs=0.0.ad"), env)).json();
+  assert.equal(calls.length, 1, "only Auto.dev ran");
+  assert.equal(new URL(calls[0].url).searchParams.get("page"), "2");
+  assert.equal(p2.results.length, 20);
+  assert.ok(p2.results.every((x) => x.url.includes("/p2-")));
+  assert.deepEqual(p2.next, ["0.0.ad"], "40 of 45, still more");
+  const p3 = await (await W.default.fetch(req("vehicles=chevy&body=pickup&yearMin=1994&yearMax=2005&dist=any&page=3&jobs=0.0.ad"), env)).json();
+  assert.deepEqual(p3.next, [], "60 >= 45, finished");
+  const bad = await W.default.fetch(req("vehicles=chevy&page=2&jobs=../../etc"), env);
+  assert.equal(bad.status, 400);
+  assert.deepEqual(W.readJobs("0.0.ad,9.9.zz,1.2.eb,x"), ["0.0.ad", "1.2.eb"]);
+});
+
+test("cab size: sent to Auto.dev, read from every source, graded", async () => {
+  mock({ "api.auto.dev": () => reply({ data: [
+    { vin: "", vehicle: { year: 2001, style: "Crew Cab Pickup" }, retailListing: { price: 1, vdp: "https://d.example/crew" } },
+    { vin: "", vehicle: { year: 2001, style: "Regular Cab Pickup" }, retailListing: { price: 1, vdp: "https://d.example/reg" } },
+    { vin: "", vehicle: { year: 2001 }, retailListing: { price: 1, vdp: "https://d.example/unknown" } },
+  ] }) });
+  const body = await (await W.default.fetch(req("vehicles=chevy&cab=crew&dist=any"), { ACCESS_CODE: "open sesame", AUTODEV_KEY: "ak" })).json();
+  assert.equal(new URL(calls[0].url).searchParams.get("vehicle.style"), "Crew Cab*");
+  const ok = (u) => body.results.find((x) => x.url === "https://d.example/" + u).checks.find((c) => c.key === "cab").ok;
+  assert.deepEqual([ok("crew"), ok("reg"), ok("unknown")], [true, false, null]);
+});
+
+test("eBay: pages of 50, US listings only, auctions marked", async () => {
+  mock({ "item_summary": () => reply({ total: 120, itemSummaries: [
+    { itemId: "a", title: "1999 Chevrolet Silverado K1500 Extended Cab 4x4", currentBidPrice: { value: "2500" }, buyingOptions: ["AUCTION"], itemWebUrl: "https://www.ebay.com/itm/a" },
+    { itemId: "b", title: "2001 Ford F-150 SuperCrew", price: { value: "7000" }, buyingOptions: ["FIXED_PRICE", "BEST_OFFER"], itemWebUrl: "https://www.ebay.com/itm/b" },
+  ] }) });
+  const env = { ACCESS_CODE: "open sesame", EBAY_CLIENT_ID: "id", EBAY_CLIENT_SECRET: "sec" };
+  const body = await (await W.default.fetch(req("vehicles=chevy+silverado&dist=any&page=2&jobs=0.0.eb"), env)).json();
+  const q = new URL(calls.find((c) => c.url.includes("item_summary")).url).searchParams;
+  assert.deepEqual([q.get("limit"), q.get("offset")], ["50", "50"]);
+  assert.match(q.get("filter"), /itemLocationCountry:US/);
+  const a = body.results.find((x) => x.url.endsWith("/a")), b = body.results.find((x) => x.url.endsWith("/b"));
+  assert.deepEqual([a.auction, a.price, a.cab, a.year], [true, 2500, "extended", 1999]);
+  assert.deepEqual([b.auction, b.cab], [false, "crew"]);
+  assert.ok(body.results.every((x) => !x.seller), "no eBay seller usernames are kept");
+  assert.deepEqual(body.next, ["0.0.eb"], "100 of 120, more");
+});
+
+test("a busy Auto.dev is retried once, and a Show more that fails for a passing reason can be retried", async () => {
+  let n = 0;
+  mock({ "api.auto.dev": () => (++n === 1 ? reply({ error: "slow down" }, 429) : reply({ data: [], total: 0 })) });
+  const env = { ACCESS_CODE: "open sesame", AUTODEV_KEY: "ak" };
+  const ok = await (await W.default.fetch(req("vehicles=ford&dist=any"), env)).json();
+  assert.equal(n, 2, "retried after 429");
+  assert.equal(ok.sources[0].ok, true);
+  mock({ "api.auto.dev": () => reply({ error: "busy" }, 503) });
+  const p2 = await (await W.default.fetch(req("vehicles=ford&dist=any&page=2&jobs=0.0.ad"), env)).json();
+  assert.deepEqual(p2.next, ["0.0.ad"], "kept so Show more can retry");
+  mock({ "api.auto.dev": () => reply({ error: "bad key" }, 401) });
+  const p3 = await (await W.default.fetch(req("vehicles=ford&dist=any&page=2&jobs=0.0.ad"), env)).json();
+  assert.deepEqual(p3.next, [], "a wrong key is not retried");
 });
 
 test("no vehicle is a clear error", async () => {

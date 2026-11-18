@@ -6,10 +6,11 @@
 })(typeof self!=="undefined"?self:this,function(){
 "use strict";
 
-var FIELDS=["vehicles","yearMin","yearMax","body","drive","cyl","engine","fuel","trans","priceMin","priceMax","milesMax","zip","dist"];
+var FIELDS=["vehicles","yearMin","yearMax","body","cab","drive","cyl","engine","fuel","trans","priceMin","priceMax","milesMax","zip","dist"];
 var LABELS={body:{pickup:"Pickup",suv:"SUV",sedan:"Sedan",coupe:"Coupe",hatchback:"Hatchback",wagon:"Wagon",convertible:"Convertible",van:"Van",minivan:"Minivan"},
   drive:{"4wd":"4x4","awd":"AWD","rwd":"RWD","fwd":"FWD"},cyl:{"4":"4 cyl","6":"6 cyl","8":"8 cyl","10":"10 cyl"},
-  fuel:{gas:"Gas",diesel:"Diesel",hybrid:"Hybrid",electric:"Electric"},trans:{automatic:"Automatic",manual:"Manual"}};
+  fuel:{gas:"Gas",diesel:"Diesel",hybrid:"Hybrid",electric:"Electric"},trans:{automatic:"Automatic",manual:"Manual"},
+  cab:{regular:"Regular cab",extended:"Extended cab",crew:"Crew cab"}};
 /* "01" means 2001 and "85" means 1985. Returns a 4-digit string, or the input when it isn't a year. */
 function fullYear(v,now){var t=String(v==null?"":v).trim();if(!/^\d{1,2}$/.test(t))return t;var n=parseInt(t,10),yy=((now||new Date()).getFullYear()%100)+1;
   return String(n<=yy?2000+n:1900+n)}
@@ -57,7 +58,7 @@ function title(c){c=migrateCriteria(c);var t=vlist(c).join(", ");
 function chipList(c){c=migrateCriteria(c);var out=[];
   if(c.yearMin||c.yearMax)out.push((c.yearMin||"any")+" to "+(c.yearMax||"now"));
   if(vlist(c).length){if(LABELS.body[c.body])out.push(LABELS.body[c.body])}
-  ["drive","cyl","fuel","trans"].forEach(function(k){if(LABELS[k][c[k]])out.push(LABELS[k][c[k]])});
+  ["cab","drive","cyl","fuel","trans"].forEach(function(k){if(LABELS[k][c[k]])out.push(LABELS[k][c[k]])});
   if(c.engine)out.push(c.engine);
   if(c.kw)out.push(c.kw);
   if(c.priceMin||c.priceMax)out.push((c.priceMin?money(c.priceMin):"$0")+" to "+(c.priceMax?money(c.priceMax):"any"));

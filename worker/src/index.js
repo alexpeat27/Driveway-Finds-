@@ -38,7 +38,10 @@ export default {
     const c = readCriteria(url.searchParams);
     if (!c.vehicles.length && !c.body) return json({ error: "no_vehicle", message: "Enter a make or model, or pick a body style." }, 400, cors);
 
-    const cacheKey = new Request("https://cache.driveway-finds/search/v2?" + canonicalQuery(c));
+    const page = int(url.searchParams.get("page"), 1, 50) || 1;
+    const jobs = page > 1 ? readJobs(url.searchParams.get("jobs")) : null;
+    if (page > 1 && !jobs.length) return json({ error: "nothing_more", message: "There are no more results for this search." }, 400, cors);
+    const cacheKey = new Request("https://cache.driveway-finds/search/v3?" + canonicalQuery(c) + "&page=" + page + "&jobs=" + (jobs || []).join(","));
     const cache = typeof caches !== "undefined" ? caches.default : null;
     if (cache && url.searchParams.get("fresh") !== "1") {
       const hit = await cache.match(cacheKey);
@@ -47,7 +50,7 @@ export default {
         return json(Object.assign(body, { cached: true }), 200, cors);
       }
     }
-    const body = await searchAll(c, env);
+    const body = await searchAll(c, env, page, jobs);
     if (cache && body.results.length) {
       const res = json(body, 200, { "Cache-Control": "max-age=" + CACHE_SECONDS });
       ctx && ctx.waitUntil ? ctx.waitUntil(cache.put(cacheKey, res)) : await cache.put(cacheKey, res);
@@ -126,13 +129,13 @@ export function readCriteria(p) {
     keywords: String(p.get("kw") || "").slice(0, 80),
     body: pick(p.get("body"), BODY_AUTODEV), drive: pick(p.get("drive"), DRIVE_AUTODEV),
     fuel: pick(p.get("fuel"), FUEL_AUTODEV), trans: pick(p.get("trans"), { automatic: 1, manual: 1 }),
-    cyl: pick(p.get("cyl"), { 4: 1, 6: 1, 8: 1, 10: 1 }),
+    cyl: pick(p.get("cyl"), { 4: 1, 6: 1, 8: 1, 10: 1 }), cab: pick(p.get("cab"), CAB_AUTODEV),
     engine: String(p.get("engine") || "").replace(/[^\w\s.-]/g, "").trim().slice(0, 30),
   };
 }
 function canonicalQuery(c) {
   return JSON.stringify([c.vehicles.map((v) => v.toLowerCase()).sort(), c.yearMin, c.yearMax, c.priceMin, c.priceMax, c.milesMax, c.zip, c.dist, c.keywords.toLowerCase(),
-    c.body, c.drive, c.fuel, c.trans, c.cyl, c.engine.toLowerCase()]);
+    c.body, c.drive, c.fuel, c.trans, c.cyl, c.engine.toLowerCase(), c.cab]);
 }
 function pick(v, allowed) { v = String(v || "").toLowerCase(); return Object.prototype.hasOwnProperty.call(allowed, v) ? v : ""; }
 
@@ -142,6 +145,12 @@ function pick(v, allowed) { v = String(v || "").toLowerCase(); return Object.pro
 const BODY_AUTODEV = { pickup: "Truck,Pickup", suv: "SUV", sedan: "Car,Sedan", coupe: "Car,Coupe", hatchback: "Car,Hatchback", wagon: "Car,Wagon", convertible: "Car,Convertible", van: "Van", minivan: "Minivan" };
 const DRIVE_AUTODEV = { "4wd": "4WD", awd: "AWD", rwd: "RWD", fwd: "FWD" };
 const FUEL_AUTODEV = { gas: "Gasoline,Flex-fuel", diesel: "Diesel", hybrid: "Hybrid,Plug-in Hybrid", electric: "Electric" };
+/* Auto.dev labels every pickup "Regular Cab Pickup", "Extended Cab Pickup" or "Crew Cab Pickup", for every make. */
+const CAB_AUTODEV = { regular: "Regular Cab*", extended: "Extended Cab*", crew: "Crew Cab*" };
+/* Cab names differ by brand. Toyota's and GM's "Double Cab" mean different things, so it is left unknown. */
+function cabWord(t) { t = String(t || "").toLowerCase();
+  return /crew|crewmax|mega ?cab/.test(t) ? "crew" : /extended|\bext\.? ?cab|super ?cab|access cab|king cab|club cab|quad cab|xtra ?cab/.test(t) ? "extended" :
+    /regular cab|reg\.? cab|standard cab|single cab/.test(t) ? "regular" : ""; }
 const BODY_LABEL = { pickup: "pickup truck", suv: "SUV", sedan: "sedan", coupe: "coupe", hatchback: "hatchback", wagon: "wagon", convertible: "convertible", van: "van", minivan: "minivan" };
 /* Turn a source's free-text value into this app's words, or "" when unknown. */
 function driveWord(t) { t = String(t || "").toLowerCase(); return /4wd|4x4|four.?wheel/.test(t) ? "4wd" : /awd|all.?wheel/.test(t) ? "awd" : /rwd|rear/.test(t) ? "rwd" : /fwd|front/.test(t) ? "fwd" : ""; }
@@ -176,7 +185,25 @@ async function timed(name, fn) {
     return { name, ok: false, count: 0, ms: Date.now() - start, error: String((e && e.message) || e).slice(0, 200), results: [] };
   }
 }
-async function getJson(url, init) {
+/* Auto.dev's free plan allows 5 requests a second, and one search can need up to 20. Requests to the same
+   host start at least 220 ms apart, and a "too many requests" answer is retried once after a pause. */
+const lastStart = new Map();
+async function spaced(url) {
+  const host = new URL(url).host, gap = /auto\.dev$/.test(host) ? 220 : 0;
+  if (!gap) return;
+  const now = Date.now(), at = Math.max(now, (lastStart.get(host) || 0) + gap);
+  lastStart.set(host, at);
+  if (at > now) await new Promise((r) => setTimeout(r, at - now));
+}
+async function getJson(url, init, retried) {
+  await spaced(url);
+  try { return await getJsonOnce(url, init); }
+  catch (e) {
+    if (!retried && /HTTP 429/.test(e.message)) { await new Promise((r) => setTimeout(r, 1200)); return getJson(url, init, true); }
+    throw e;
+  }
+}
+async function getJsonOnce(url, init) {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), TIMEOUT_MS);
   try {
@@ -197,45 +224,72 @@ export function looserSearches(c) {
     // Nearby years only; the searched years were already covered.
     out.push(Object.assign({}, c, { yearMin: Math.max(1950, lo - 3), yearMax: Math.min(2035, hi + 3), skipYears: [lo, hi] }));
   }
-  if (c.body || c.drive || c.fuel || c.trans || c.cyl || c.engine) out.push(Object.assign({}, c, { body: "", drive: "", fuel: "", trans: "", cyl: "", engine: "" }));
+  if (c.body || c.drive || c.fuel || c.trans || c.cyl || c.engine || c.cab) out.push(Object.assign({}, c, { body: "", drive: "", fuel: "", trans: "", cyl: "", engine: "", cab: "" }));
   if (c.priceMin || c.priceMax || c.milesMax) out.push(Object.assign({}, c, { priceMin: null, priceMax: null, milesMax: null }));
   return out;
 }
 const ENOUGH_EXACT = 10;
 
-export async function searchAll(c, env) {
-  const vehicles = c.vehicles.length ? c.vehicles : [""];
-  const run = (crit, withEbay) => {
-    const jobs = [];
-    for (const v of vehicles) {
-      const mm = splitVehicle(v);
-      if (env.MARKETCHECK_KEY) {
-        jobs.push(timed("MarketCheck", () => marketcheck(crit, mm, env, "dealer")));
-        jobs.push(timed("MarketCheck private sellers", () => marketcheck(crit, mm, env, "private")));
-      }
-      if (env.AUTODEV_KEY) jobs.push(timed("Auto.dev", () => autodev(crit, mm, env)));
-      if (withEbay && env.EBAY_CLIENT_ID && env.EBAY_CLIENT_SECRET) jobs.push(timed("eBay Motors", () => ebay(crit, v, env)));
-    }
-    return Promise.all(jobs);
-  };
-  let done = await run(c, true);
-  const exactSoFar = merge([].concat(...done.map((d) => d.results))).filter((l) => grade(l, c).exact).length;
-  let widened = false;
-  if (exactSoFar < ENOUGH_EXACT) {
-    const extra = await Promise.all(looserSearches(c).map((crit) => run(crit, false)));
-    for (const e of extra) done = done.concat(e);
-    widened = extra.length > 0;
+/* A "job" is one request to one source: which search version (0 = exact, 1+ = looser), which vehicle,
+   and which source. Page 1 runs them all; "Show more" sends back the jobs that had more, and only those run. */
+const SOURCES = {
+  ad: { name: "Auto.dev", on: (env) => !!env.AUTODEV_KEY, run: (crit, v, env, page) => autodev(crit, splitVehicle(v), env, page) },
+  mc: { name: "MarketCheck", on: (env) => !!env.MARKETCHECK_KEY, run: (crit, v, env, page) => marketcheck(crit, splitVehicle(v), env, "dealer", page) },
+  mp: { name: "MarketCheck private sellers", on: (env) => !!env.MARKETCHECK_KEY, run: (crit, v, env, page) => marketcheck(crit, splitVehicle(v), env, "private", page) },
+  eb: { name: "eBay Motors", on: (env) => !!(env.EBAY_CLIENT_ID && env.EBAY_CLIENT_SECRET), exactOnly: true, run: (crit, v, env, page) => ebay(crit, v, env, page) },
+};
+export function readJobs(text) {
+  return String(text || "").split(",").filter((j) => /^\d\.\d\.(ad|mc|mp|eb)$/.test(j)).slice(0, 40);
+}
+async function runJob(id, versions, vehicles, env, page) {
+  const [vi, hi, key] = id.split(".");
+  const src = SOURCES[key], crit = versions[+vi], v = vehicles[+hi];
+  const start = Date.now();
+  if (!src || !crit || v == null || !src.on(env)) return { id, name: src ? src.name : key, ok: false, count: 0, results: [], error: "unknown search" };
+  try {
+    const r = await src.run(crit, v, env, page);
+    return { id, name: src.name, ok: true, count: r.rows.length, total: r.total, more: r.more, exactVersion: vi === "0", ms: Date.now() - start, results: r.rows };
+  } catch (e) {
+    return { id, name: src.name, ok: false, count: 0, ms: Date.now() - start, error: String((e && e.message) || e).slice(0, 200), results: [] };
   }
-  // One status line per source, adding up counts across vehicles and looser searches.
+}
+
+export async function searchAll(c, env, page = 1, onlyJobs = null) {
+  const vehicles = c.vehicles.length ? c.vehicles : [""];
+  const versions = [c].concat(looserSearches(c));
+  const jobsFor = (vi) => {
+    const ids = [];
+    vehicles.forEach((v, hi) => { for (const key of Object.keys(SOURCES)) if (SOURCES[key].on(env) && !(vi > 0 && SOURCES[key].exactOnly)) ids.push(vi + "." + hi + "." + key); });
+    return ids;
+  };
+  let done, widened = false;
+  if (onlyJobs) {
+    done = await Promise.all(onlyJobs.map((id) => runJob(id, versions, vehicles, env, page)));
+    widened = onlyJobs.some((id) => !id.startsWith("0."));
+  } else {
+    done = await Promise.all(jobsFor(0).map((id) => runJob(id, versions, vehicles, env, 1)));
+    const exactSoFar = merge([].concat(...done.map((d) => d.results))).filter((l) => grade(l, c).exact).length;
+    if (exactSoFar < ENOUGH_EXACT && versions.length > 1) {
+      const extra = await Promise.all(versions.slice(1).map((_, i) => Promise.all(jobsFor(i + 1).map((id) => runJob(id, versions, vehicles, env, 1)))));
+      for (const e of extra) done = done.concat(e);
+      widened = true;
+    }
+  }
+  // One status line per source. "total" counts only the exact search, so the same cars aren't counted twice.
   const sources = [];
   for (const d of done) {
-    const s = sources.find((x) => x.name === d.name);
-    if (!s) sources.push({ name: d.name, ok: d.ok, count: d.count, error: d.error || "" });
-    else { s.count += d.count; s.ok = s.ok && d.ok; if (d.error && !s.error) s.error = d.error; }
+    let s = sources.find((x) => x.name === d.name);
+    if (!s) { s = { name: d.name, ok: true, count: 0, total: null, error: "" }; sources.push(s); }
+    s.count += d.count; s.ok = s.ok && d.ok; if (d.error && !s.error) s.error = d.error;
+    if (d.exactVersion && d.total != null) s.total = (s.total || 0) + d.total;
   }
   const results = merge([].concat(...done.map((d) => d.results))).map((l) => Object.assign(l, grade(l, c)));
   results.sort(byMatch);
-  return { results, sources, enabled: enabledSources(env), widened, at: Date.now() };
+  // Sources with more go on the Show more list. So does one that failed for a passing reason (busy, slow),
+  // so the button can retry it; a wrong key isn't retried.
+  const passing = (d) => !d.ok && /HTTP 429|HTTP 5\d\d|abort|timed out|fetch failed/i.test(d.error || "");
+  const next = done.filter((d) => (d.ok && d.more) || (page > 1 && passing(d))).map((d) => d.id);
+  return { results, sources, enabled: enabledSources(env), widened, page, next, at: Date.now() };
 }
 /* Exact matches first, newest first; then the rest by fewest misses, nearest year, newest. */
 export function byMatch(a, b) {
@@ -271,7 +325,7 @@ function score(l) { return (l.photo ? 4 : 0) + (l.price ? 2 : 0) + (l.miles != n
 const LABEL = {
   body: { pickup: "Pickup", suv: "SUV", sedan: "Sedan", coupe: "Coupe", hatchback: "Hatchback", wagon: "Wagon", convertible: "Convertible", van: "Van", minivan: "Minivan" },
   drive: { "4wd": "4x4", awd: "AWD", rwd: "RWD", fwd: "FWD" }, fuel: { gas: "Gas", diesel: "Diesel", hybrid: "Hybrid", electric: "Electric" },
-  trans: { automatic: "Automatic", manual: "Manual" },
+  trans: { automatic: "Automatic", manual: "Manual" }, cab: { regular: "Regular cab", extended: "Extended cab", crew: "Crew cab" },
 };
 const money = (n) => "$" + Number(n).toLocaleString("en-US");
 export function grade(l, c) {
@@ -288,6 +342,7 @@ export function grade(l, c) {
   }
   if (c.drive) add("drive", LABEL.drive[c.drive], l.drive === c.drive, !!l.drive);
   if (c.cyl) add("cyl", c.cyl + " cyl", l.cyl === Number(c.cyl), !!l.cyl);
+  if (c.cab) add("cab", LABEL.cab[c.cab], l.cab === c.cab, !!l.cab);
   if (c.body) add("body", LABEL.body[c.body], l.body === c.body || (l.body === "car" && ["sedan", "coupe", "hatchback", "wagon", "convertible"].includes(c.body)), !!l.body);
   if (c.fuel) add("fuel", LABEL.fuel[c.fuel], l.fuel === c.fuel, !!l.fuel);
   if (c.trans) add("trans", LABEL.trans[c.trans], l.trans === c.trans, !!l.trans);
@@ -320,14 +375,16 @@ function listing(o) {
     seller: String(o.seller || "").slice(0, 80), listedAt: time(o.listedAt),
     body: bodyWord(o.body), drive: driveWord(o.drive), fuel: fuelWord(o.fuel), trans: transWord(o.trans),
     cyl: num(o.cyl) || null, engine: String(o.engine || "").slice(0, 60),
+    cab: cabWord(o.cab || o.title), auction: !!o.auction,
   };
 }
 
 /* ---------- MarketCheck ----------
    Dealer search: GET /v2/search/car/active. Private sellers: GET /v2/search/car/fsbo/active.
    Free plan: 500 calls a month, searches within 100 miles. */
-async function marketcheck(c, mm, env, kind) {
-  const p = new URLSearchParams({ api_key: env.MARKETCHECK_KEY, rows: String(MAX_PER_SOURCE), sort_by: "dom", sort_order: "asc" });
+async function marketcheck(c, mm, env, kind, page = 1) {
+  const rows = MAX_PER_SOURCE, startAt = (page - 1) * rows;
+  const p = new URLSearchParams({ api_key: env.MARKETCHECK_KEY, rows: String(rows), start: String(startAt), sort_by: "dom", sort_order: "asc" });
   if (mm.make) p.set("make", properMake(mm.make).toLowerCase());
   if (mm.model) p.set("model", mm.model);
   if (kind === "dealer") p.set("car_type", "used");
@@ -338,7 +395,8 @@ async function marketcheck(c, mm, env, kind) {
   if (c.zip && c.dist) { p.set("zip", c.zip); p.set("radius", String(Math.min(c.dist, 100))); }
   const path = kind === "private" ? "/v2/search/car/fsbo/active" : "/v2/search/car/active";
   const j = await getJson("https://api.marketcheck.com" + path + "?" + p.toString());
-  return (j.listings || []).map((x) => {
+  const total = num(j.num_found);
+  const out = (j.listings || []).map((x) => {
     const b = x.build || {}, d = x.dealer || x.seller || {}, m = x.media || {};
     const photos = m.photo_links || m.photo_links_cached || x.photo_links || [];
     return listing({
@@ -347,16 +405,20 @@ async function marketcheck(c, mm, env, kind) {
       price: x.price, miles: x.miles, vin: x.vin, url: x.vdp_url || x.source_url || x.url, photo: photos[0], photoCount: photos.length,
       city: d.city || x.city, state: d.state || x.state, distance: x.dist, seller: d.name || x.seller_name,
       listedAt: x.first_seen_at || x.first_seen_at_date || x.scraped_at,
-      body: b.body_type, drive: b.drivetrain, fuel: b.fuel_type, trans: b.transmission, cyl: b.cylinders, engine: b.engine,
+      body: b.body_type, drive: b.drivetrain, fuel: b.fuel_type, trans: b.transmission, cyl: b.cylinders, engine: b.engine, cab: b.cab_type,
     });
   });
+  return { rows: out, total, more: total != null ? startAt + out.length < total : out.length >= rows };
 }
 
 /* ---------- Auto.dev ----------
    GET https://api.auto.dev/listings with "Authorization: Bearer <key>". Ranges are written min-max.
    Free plan: 1,000 calls a month. */
-async function autodev(c, mm, env) {
-  const p = new URLSearchParams({ limit: String(MAX_PER_SOURCE) }); // the free plan returns at most 20
+const AUTODEV_PAGE = 20; // the free plan returns at most 20 per request
+async function autodev(c, mm, env, page = 1) {
+  // Newest listed first. Listing dates never change, so pages don't shift between Show more requests
+  // (the default, most recently updated, reshuffles as dealers edit listings, repeating and skipping cars).
+  const p = new URLSearchParams({ limit: String(AUTODEV_PAGE), page: String(page), includes: "total", sort: "createdAt.desc" });
   if (mm.make) p.set("vehicle.make", properMake(mm.make));
   if (mm.model) p.set("vehicle.model", modelSpellings(mm.model));
   if (c.skipYears) {
@@ -374,11 +436,13 @@ async function autodev(c, mm, env) {
   if (c.fuel) p.set("vehicle.fuel", FUEL_AUTODEV[c.fuel]);
   if (c.trans) p.set("vehicle.transmission", c.trans === "manual" ? "Manual" : "Automatic");
   if (c.cyl) p.set("vehicle.cylinders", c.cyl);
+  if (c.cab) p.set("vehicle.style", CAB_AUTODEV[c.cab]);
   // Auto.dev reads a ZIP without a distance as "this ZIP only", so "Anywhere in the US" sends neither.
   if (c.zip && c.dist) { p.set("zip", c.zip); p.set("distance", String(c.dist)); }
   const j = await getJson("https://api.auto.dev/listings?" + p.toString(), { headers: { Authorization: "Bearer " + env.AUTODEV_KEY } });
   const rows = Array.isArray(j) ? j : j.data || j.records || j.listings || [];
-  return rows.map((x) => {
+  const total = num(j.total);
+  const out = rows.map((x) => {
     const v = x.vehicle || {}, r = x.retailListing || x.listing || {};
     return listing({
       source: "Auto.dev", sellerType: "dealer",
@@ -387,9 +451,11 @@ async function autodev(c, mm, env) {
       vin: x.vin || v.vin, url: r.vdp || r.vdpUrl || x.vdpUrl || x.clickoffUrl, photo: r.primaryImage || x.primaryPhotoUrl || (x.photoUrls || [])[0],
       photoCount: r.photoCount || (x.photoUrls || []).length, city: r.city || x.city, state: r.state || x.state,
       distance: x.distanceFromOrigin || x.distance, seller: r.dealer || x.dealerName, listedAt: x.createdAt || x.created_at,
-      body: v.bodyStyle, drive: v.drivetrain, fuel: v.fuel, trans: v.transmission, cyl: v.cylinders, engine: v.engine,
+      body: v.bodyStyle, drive: v.drivetrain, fuel: v.fuel, trans: v.transmission, cyl: v.cylinders, engine: v.engine, cab: v.style,
     });
   });
+  const more = total != null ? (page - 1) * AUTODEV_PAGE + rows.length < total : rows.length >= AUTODEV_PAGE;
+  return { rows: out, total, more: more && rows.length > 0 };
 }
 
 /* ---------- eBay Motors ----------
@@ -406,26 +472,37 @@ async function ebayAuth(env) {
   ebayToken = { value: j.access_token, until: Date.now() + Math.max(60, (j.expires_in || 7200) - 300) * 1000 };
   return ebayToken.value;
 }
-async function ebay(c, vehicle, env) {
+const EBAY_PAGE = 50;
+async function ebay(c, vehicle, env, page = 1) {
   const token = await ebayAuth(env);
   const q = [vehicle || BODY_LABEL[c.body] || "", c.drive === "4wd" ? "4x4" : "", c.fuel === "diesel" ? "diesel" : "", c.engine, c.keywords].filter(Boolean).join(" ");
-  const p = new URLSearchParams({ q, category_ids: "6001", limit: String(MAX_PER_SOURCE), sort: "newlyListed" });
-  const f = ["buyingOptions:{FIXED_PRICE|BEST_OFFER|AUCTION}", "deliveryCountry:US"];
+  const offset = (page - 1) * EBAY_PAGE;
+  const p = new URLSearchParams({ q, category_ids: "6001", limit: String(EBAY_PAGE), offset: String(offset), sort: "newlyListed" });
+  const f = ["buyingOptions:{FIXED_PRICE|BEST_OFFER|AUCTION}", "itemLocationCountry:US"];
   if (c.priceMin || c.priceMax) f.push("price:[" + (c.priceMin || 0) + ".." + (c.priceMax || "") + "]", "priceCurrency:USD");
   if (c.zip && c.dist) f.push("pickupCountry:US", "pickupPostalCode:" + c.zip, "pickupRadius:" + c.dist, "pickupRadiusUnit:mi");
   p.set("filter", f.join(","));
   const headers = { Authorization: "Bearer " + token, "X-EBAY-C-MARKETPLACE-ID": "EBAY_US" };
   if (c.zip) headers["X-EBAY-C-ENDUSERCTX"] = "contextualLocation=" + encodeURIComponent("country=US,zip=" + c.zip);
   const j = await getJson("https://api.ebay.com/buy/browse/v1/item_summary/search?" + p.toString(), { headers });
-  return (j.itemSummaries || []).map((x) => {
+  const items = j.itemSummaries || [];
+  const out = items.map((x) => {
     const yr = String(x.title || "").match(/\b(19[5-9]\d|20[0-3]\d)\b/);
     const loc = x.itemLocation || {};
+    const opts = x.buyingOptions || [];
+    // An auction with no Buy It Now shows the current bid, which isn't a sale price.
+    const auction = opts.includes("AUCTION") && !opts.includes("FIXED_PRICE");
+    const price = (x.price && x.price.value) || (x.currentBidPrice && x.currentBidPrice.value);
     return listing({
-      source: "eBay Motors", sellerType: "",
-      title: x.title, year: yr ? yr[1] : null, price: x.price && x.price.value, miles: null,
+      source: "eBay Motors", sellerType: "", auction,
+      title: x.title, year: yr ? yr[1] : null, price, miles: null,
       url: x.itemWebUrl, photo: (x.image && x.image.imageUrl) || (x.thumbnailImages && x.thumbnailImages[0] && x.thumbnailImages[0].imageUrl),
       photoCount: 1 + (x.additionalImages || []).length, city: loc.city, state: loc.stateOrProvince,
-      seller: x.seller && x.seller.username, listedAt: x.itemCreationDate,
+      // No seller username: the app keeps no eBay user data, which is what eBay's
+      // account-deletion exemption requires.
+      listedAt: x.itemCreationDate,
     });
   });
+  const total = num(j.total);
+  return { rows: out, total, more: total != null ? offset + items.length < total : items.length >= EBAY_PAGE };
 }
