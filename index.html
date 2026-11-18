@@ -149,7 +149,18 @@ ul.checks{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:5px
   nav.tabs a{flex:1;justify-content:center;padding:9px 6px 8px;font-size:18px}
   .brand h1{font-size:28px}
 }
-@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+.update{position:fixed;left:0;right:0;top:0;z-index:50;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:10px 14px;
+  padding:10px 16px;background:var(--flag);color:var(--flag-ink);font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.25);overflow:hidden}
+.update[hidden]{display:none}
+.update::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 0,rgba(255,255,255,.55) 50%,transparent 100%);
+  transform:translateX(-100%);animation:upd-flash 1.6s ease-in-out 3;pointer-events:none}
+.upd-icon{font-size:22px;line-height:1;display:inline-block;animation:upd-spin 1.2s linear infinite}
+.update .btn{background:var(--flag-ink);color:var(--flag);border-color:var(--flag-ink)}
+.update .btn:hover{background:var(--flag-ink);filter:brightness(1.2)}
+.upd-x{background:none;border:0;color:var(--flag-ink);font-size:22px;line-height:1;cursor:pointer;padding:0 4px}
+@keyframes upd-flash{to{transform:translateX(100%)}}
+@keyframes upd-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}.update::after,.upd-icon{animation:none}}
 </style>
 </head>
 <body>
@@ -315,6 +326,12 @@ ul.checks{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:5px
   </section>
 </div>
 <div class="toast" id="toast" role="status"></div>
+<div class="update" id="update" role="alert" hidden>
+  <span class="upd-icon" aria-hidden="true">↻</span>
+  <span class="upd-text">A newer version of Driveway Finds is available.</span>
+  <button type="button" class="btn sm" id="update-now">Update now</button>
+  <button type="button" class="upd-x" id="update-later" aria-label="Dismiss until next check">×</button>
+</div>
 
 <script src="core.js"></script>
 <script>
@@ -713,6 +730,30 @@ $("import").addEventListener("change",function(){var file=$("import").files[0];$
     Promise.all(plan.searches.map(function(s){var d=Object.assign({},s);delete d.id;return db.doc("searches/"+s.id).set(d)})
       .concat(plan.finds.map(function(f){var d=Object.assign({},f);delete d.id;return db.doc("finds/"+f.id).set(d)}))).then(done,fail);
     function done(){toast("Restored "+plan.searches.length+" searches and "+plan.finds.length+" finds"+(plan.skipped?". Skipped "+plan.skipped+" already here.":"."))}})});
+
+/* ---------- update notice ----------
+   Compares the copy of the page and core.js this browser is using with the newest copy on the site.
+   "force-cache" returns the copy already in the browser; "no-store" always asks the site. Any difference
+   means a newer version was published. Pages opened from a file, or offline, skip the check quietly. */
+var UPDATE_FILES=["./","core.js"],updateBase=null,updateShown=false;
+function fileText(u,mode){return fetch(new URL(u,location.href).href.replace(/#.*$/,""),{cache:mode}).then(function(r){if(!r.ok)throw new Error("http");return r.text()})}
+function snapshot(mode){return Promise.all(UPDATE_FILES.map(function(u){return fileText(u,mode)})).then(function(t){return t.join("\n\u0000\n")})}
+function checkForUpdate(){
+  if(updateShown||!/^https?:$/.test(location.protocol))return Promise.resolve(false);
+  var base=updateBase||snapshot("force-cache").then(function(t){return t},function(){return null});updateBase=base;
+  return Promise.all([base,snapshot("no-store").catch(function(){return null})]).then(function(r){
+    if(r[0]==null||r[1]==null||r[0]===r[1])return false;
+    updateShown=true;$("update").hidden=false;return true})}
+window.dfCheckForUpdate=checkForUpdate;
+$("update-now").addEventListener("click",function(){
+  /* Refresh the cached copies first so the reload can't show the old version again. */
+  Promise.all(UPDATE_FILES.map(function(u){return fileText(u,"reload").catch(function(){})})).then(function(){location.reload()})});
+$("update-later").addEventListener("click",function(){$("update").hidden=true;updateShown=false;updateBase=null});
+/* Record this copy's version right away, while the browser still holds exactly what it just loaded. */
+if(/^https?:$/.test(location.protocol))updateBase=snapshot("force-cache").then(function(t){return t},function(){return null});
+setTimeout(checkForUpdate,3000);
+setInterval(checkForUpdate,10*60*1000);
+document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible")checkForUpdate()});
 
 /* ---------- tabs ---------- */
 function route(){var h=(location.hash||"").replace("#","");if(["search","watchlist","finds"].indexOf(h)<0)h="search";

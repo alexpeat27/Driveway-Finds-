@@ -295,3 +295,37 @@ test("results split into best matches (green) and other results with ✓ ✗ ? p
     await browser.close();
   }
 });
+
+test("an update banner flashes when a newer version of the page is published", { skip: !chromium && "playwright is not installed" }, async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
+  const root = path.resolve(__dirname, "..");
+  let html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  const core = fs.readFileSync(path.join(root, "core.js"), "utf8");
+  await page.route("http://site.test/**", (r) => {
+    const u = new URL(r.request().url());
+    if (u.pathname.endsWith("core.js")) return r.fulfill({ contentType: "application/javascript", body: core });
+    return r.fulfill({ contentType: "text/html", body: html });
+  });
+  try {
+    await page.goto("http://site.test/app/");
+    assert.equal(await page.evaluate(() => window.dfCheckForUpdate()), false, "same version: no banner");
+
+    // A version published right after the page opened, before its first check, is still caught.
+    await page.reload();
+    html = html.replace("<title>", "<!-- quick change --><title>");
+    assert.equal(await page.evaluate(() => window.dfCheckForUpdate()), true, "caught a change before the first check");
+    await Promise.all([page.waitForNavigation(), page.click("#update-now")]);
+    assert.equal(await page.evaluate(() => window.dfCheckForUpdate()), false);
+    assert.equal(await page.isVisible("#update"), false);
+    html = html.replace("<title>", "<!-- new version --><title>");
+    assert.equal(await page.evaluate(() => window.dfCheckForUpdate()), true);
+    assert.equal(await page.isVisible("#update"), true);
+    assert.match(await page.textContent("#update"), /newer version/);
+    await Promise.all([page.waitForNavigation(), page.click("#update-now")]);
+    assert.equal(await page.isVisible("#update"), false, "reloaded onto the new version");
+    assert.match(await page.content(), /new version/);
+  } finally {
+    await browser.close();
+  }
+});
