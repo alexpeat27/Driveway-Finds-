@@ -136,6 +136,10 @@ details.more .stack{margin-top:8px}
 .rc .meta{margin:0}
 .rc .actions{margin-top:auto;padding-top:6px}
 .r-group{margin-bottom:26px}
+.more-row{display:flex;flex-direction:column;align-items:center;gap:6px;margin:6px 0 30px}
+.more-row[hidden]{display:none}
+.more-row .btn{min-width:260px}
+.pill.auction{background:var(--warn-bg);color:var(--warn)}
 .r-sub{font-size:21px;text-transform:uppercase;margin:0 0 4px}
 .r-group .note{margin:0 0 12px}
 .r-group.best .r-sub{color:var(--good)}
@@ -194,6 +198,9 @@ ul.checks{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:5px
             </label>
             <label class="f">Body style
               <select id="body"><option value="">Any</option><option value="pickup">Pickup</option><option value="suv">SUV</option><option value="sedan">Sedan</option><option value="coupe">Coupe</option><option value="hatchback">Hatchback</option><option value="wagon">Wagon</option><option value="convertible">Convertible</option><option value="van">Van</option><option value="minivan">Minivan</option></select>
+            </label>
+            <label class="f">Cab size (pickups)
+              <select id="cab"><option value="">Any</option><option value="regular">Regular cab</option><option value="extended">Extended cab</option><option value="crew">Crew cab</option></select>
             </label>
           </div>
           <p class="note">A make alone works too, and so does a body style with no make. Up to 5 makes or models.</p>
@@ -258,6 +265,10 @@ ul.checks{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:5px
       </div>
       <div class="r-status" id="r-status"></div>
       <div id="r-list"></div>
+      <div class="more-row" id="r-more-row" hidden>
+        <button type="button" class="btn big" id="r-more">Show more</button>
+        <div class="note" id="r-more-note"></div>
+      </div>
     </section>
   </section>
 
@@ -651,22 +662,47 @@ function runSearchAll(){
   var c=readForm();
   if(!vlist(c).length&&!c.body){toast("Enter a make or model, or pick a body style.");$("vehicles").focus();return}
   if(!workerBase()){toast("Connect your search server on the Watchlist tab first.");location.hash="watchlist";setTimeout(function(){$("workerUrl").focus()},50);return}
-  var p=new URLSearchParams();["vehicles","yearMin","yearMax","body","drive","cyl","engine","fuel","trans","priceMin","priceMax","milesMax","zip","dist"].forEach(function(k){if(c[k])p.set(k,c[k])});
+  var p=new URLSearchParams();["vehicles","yearMin","yearMax","body","cab","drive","cyl","engine","fuel","trans","priceMin","priceMax","milesMax","zip","dist"].forEach(function(k){if(c[k])p.set(k,c[k])});
   var b=$("search-all");b.disabled=true;b.textContent="Searching…";
   state.results={loading:true,title:title(c)};renderResults();
-  callWorker("/search",p).then(function(j){state.results={title:title(c),list:j.results||[],sources:j.sources||[],enabled:j.enabled||[],cached:!!j.cached,at:j.at||Date.now()}},
+  callWorker("/search",p).then(function(j){state.results={title:title(c),params:p.toString(),page:1,next:j.next||[],list:j.results||[],sources:j.sources||[],enabled:j.enabled||[],cached:!!j.cached,at:j.at||Date.now()}},
     function(e){state.results={title:title(c),error:e.message}})
   .then(function(){b.disabled=false;b.textContent="Search";renderResults();$("results").scrollIntoView({behavior:"smooth",block:"start"})})}
+/* Same car twice (same VIN or same link) counts once. */
+function resultKey(x){return x.vin?"vin:"+x.vin:"url:"+String(x.url||"").replace(/[?#].*$/,"").replace(/\/+$/,"").toLowerCase()}
+/* Same order the server uses: exact first, then fewest misses, nearest year, newest. */
+function byMatch(a,b){var ea=a.exact!==false,eb=b.exact!==false;if(ea!==eb)return ea?-1:1;
+  if(!ea&&(a.misses||0)!==(b.misses||0))return (a.misses||0)-(b.misses||0);
+  if(!ea&&(a.yearGap||0)!==(b.yearGap||0))return (a.yearGap||0)-(b.yearGap||0);
+  return (b.listedAt||0)-(a.listedAt||0)}
+function showMore(){
+  var r=state.results;if(!r||!r.next||!r.next.length||r.loadingMore)return;
+  var p=new URLSearchParams(r.params);p.set("page",String(r.page+1));p.set("jobs",r.next.join(","));
+  r.loadingMore=true;renderMore();
+  callWorker("/search",p).then(function(j){
+    var seen={};r.list.forEach(function(x){seen[resultKey(x)]=x});var added=0;
+    (j.results||[]).forEach(function(x){var k=resultKey(x);if(seen[k]){var h=seen[k];if(x.url&&x.url!==h.url)(h.also=h.also||[]).push({source:x.source,url:x.url});return}seen[k]=x;r.list.push(x);added++});
+    r.list.sort(byMatch);r.page=j.page||r.page+1;r.next=j.next||[];
+    (j.sources||[]).forEach(function(s){var o=r.sources.find(function(x){return x.name===s.name});if(o){o.count+=s.count;o.ok=o.ok&&s.ok;if(s.error)o.error=s.error}else r.sources.push(s)});
+    r.loadingMore=false;renderResults();toast(added?"Added "+added+" more":"No new cars on that page")},
+  function(e){r.loadingMore=false;renderMore();toast(e.message)})}
+function renderMore(){var r=state.results,row=$("r-more-row");
+  var on=!!(r&&r.list&&!r.error&&!r.loading&&r.next&&r.next.length);row.hidden=!on&&!(r&&r.loadingMore);if(!r||!r.list)return;
+  var b=$("r-more");b.disabled=!!r.loadingMore;b.textContent=r.loadingMore?"Loading more…":"Show more";
+  var total=(r.sources||[]).reduce(function(n,s){return n+(s.total||0)},0);
+  $("r-more-note").textContent=total>r.list.length?"Showing "+r.list.length+" of about "+total.toLocaleString("en-US")+". Each Show more uses one search from each source that has more.":""}
+$("r-more").addEventListener("click",showMore);
 function renderResults(){
   var r=state.results,sec=$("results");sec.hidden=!r;if(!r)return;
   var list=$("r-list"),st=$("r-status");list.textContent="";st.textContent="";
+  renderMore();
   if(r.loading){$("r-head").textContent="Searching for "+r.title+"…";return}
   if(r.error){$("r-head").textContent="Results";var e=el("div","empty");e.appendChild(el("strong",null,"Search didn't run"));e.appendChild(document.createTextNode(r.error));list.appendChild(e);return}
   /* Responses from before match grading have no "exact" field; treat those as exact. */
   var exact=r.list.filter(function(x){return x.exact!==false}),other=r.list.filter(function(x){return x.exact===false});
   $("r-head").textContent=!r.list.length?"No results for "+r.title:exact.length?(exact.length+(exact.length===1?" best match":" best matches")+(other.length?", "+other.length+" close":"")+" for "+r.title):("No exact matches, "+other.length+" close for "+r.title);
   if(!r.enabled.length)st.appendChild(el("span","pill warn","No sources have keys yet. Add them to your search server."));
-  r.sources.forEach(function(s){var p=el("span","pill "+(s.ok?"fb":"warn"),s.name+": "+(s.ok?s.count:"failed"));if(s.error)p.title=s.error;st.appendChild(p)});
+  r.sources.forEach(function(s){var p=el("span","pill "+(s.ok?"fb":"warn"),s.name+": "+(s.ok?s.count+(s.total>s.count?" of "+Number(s.total).toLocaleString("en-US"):""):"failed"));if(s.error)p.title=s.error;st.appendChild(p)});
   if(r.cached)st.appendChild(el("span","pill fb","Saved copy from the last 15 minutes"));
   r.sources.filter(function(s){return !s.ok}).forEach(function(s){var d=el("div","note",s.name+": "+s.error);d.style.flexBasis="100%";d.style.margin="0";st.appendChild(d)});
   if(!r.list.length){var e2=el("div","empty");e2.appendChild(el("strong",null,"Nothing found"));e2.appendChild(document.createTextNode("No listings for this make and model in this area. Try a wider distance, or check the model's spelling, e.g. S-10, F-150."));list.appendChild(e2);return}
@@ -697,6 +733,7 @@ function resultCard(x){
       li.title=c.ok===true?"Meets this filter":c.ok===false?"Doesn't meet this filter":"The listing doesn't say";cr.appendChild(li)});bd.appendChild(cr)}
   var pills=el("div","row");pills.appendChild(el("span","pill fb",x.source));
   if(x.sellerType==="private")pills.appendChild(el("span","pill good","Private seller"));
+  if(x.auction)pills.appendChild(el("span","pill auction","Auction: price is the current bid"));
   if(x.listedAt&&Date.now()-x.listedAt<2*864e5)pills.appendChild(el("span","pill new","New"));
   var ts=DF.detectTitle(x.title);if(ts)pills.appendChild(el("span","pill bad",ts==="salvage"?"Salvage title":"Rebuilt title"));
   var cp=cpm(x);if(cp!=null)pills.appendChild(el("span","pill fb","$"+cp.toFixed(2)+"/remaining mi"));

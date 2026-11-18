@@ -199,6 +199,7 @@ test("Search everything shows merged results with photos and saves to Finds", { 
     // Save one to Finds, and it keeps its photo.
     await page.locator("#r-list .rc").first().getByRole("button", { name: "Save to Finds" }).click();
     await page.waitForFunction(() => document.getElementById("n-finds").textContent === "1");
+    await page.locator("#r-list .rc").first().getByRole("button", { name: "In Finds" }).waitFor();
     assert.ok(await page.locator("#r-list .rc").first().getByRole("button", { name: "In Finds" }).isDisabled());
     await page.goto(PAGE + "#finds");
     assert.match(await page.locator("#find-list .item").first().textContent(), /Private seller/);
@@ -325,6 +326,45 @@ test("an update banner flashes when a newer version of the page is published", {
     await Promise.all([page.waitForNavigation(), page.click("#update-now")]);
     assert.equal(await page.isVisible("#update"), false, "reloaded onto the new version");
     assert.match(await page.content(), /new version/);
+  } finally {
+    await browser.close();
+  }
+});
+
+test("Show more adds the next page and the cab size filter is sent", { skip: !chromium && "playwright is not installed" }, async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
+  const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "X-Access-Code" };
+  const seen = [];
+  const car = (n) => ({ source: "Auto.dev", title: "2001 Chevrolet Silverado " + n, price: 9000 + n, url: "https://d.example/" + n, exact: true, misses: 0, listedAt: 1000 - n, checks: [] });
+  await page.route("https://w.example/**", (r) => {
+    if (r.request().method() === "OPTIONS") return r.fulfill({ status: 204, headers: cors });
+    const q = new URL(r.request().url()).searchParams; seen.push(q);
+    const pg = Number(q.get("page") || 1);
+    const results = pg === 1 ? [car(1), car(2)] : [car(2), car(3)]; // car 2 again on page 2: shown once
+    return r.fulfill({ headers: cors, contentType: "application/json", body: JSON.stringify({
+      enabled: ["Auto.dev"], page: pg, next: pg < 2 ? ["0.0.ad"] : [], results,
+      sources: [{ name: "Auto.dev", ok: true, count: 2, total: pg === 1 ? 2791 : null }] }) });
+  });
+  try {
+    await page.goto(PAGE);
+    await page.evaluate(() => { localStorage.clear(); localStorage.setItem("driveway-finds-v1", JSON.stringify({ searches: [], finds: [], settings: { workerUrl: "https://w.example" } })); localStorage.setItem("driveway-finds-access", "x"); });
+    await page.reload();
+    await page.fill("#vehicles", "chevy");
+    await page.selectOption("#body", "pickup");
+    await page.selectOption("#cab", "extended");
+    await page.click("#search-all");
+    await page.waitForSelector("#r-list .rc");
+    assert.equal(seen[0].get("cab"), "extended");
+    assert.match(await page.textContent("#r-status"), /Auto\.dev: 2 of 2,791/);
+    assert.equal(await page.isVisible("#r-more"), true);
+    assert.match(await page.textContent("#r-more-note"), /Showing 2 of about 2,791/);
+    await page.click("#r-more");
+    await page.waitForFunction(() => document.querySelectorAll("#r-list .rc").length === 3);
+    assert.equal(seen[1].get("page"), "2");
+    assert.equal(seen[1].get("jobs"), "0.0.ad");
+    assert.equal(seen[1].get("cab"), "extended");
+    assert.equal(await page.isVisible("#r-more"), false, "nothing more after page 2");
   } finally {
     await browser.close();
   }
