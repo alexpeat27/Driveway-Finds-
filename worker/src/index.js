@@ -38,7 +38,7 @@ export default {
     const c = readCriteria(url.searchParams);
     if (!c.vehicles.length && !c.body) return json({ error: "no_vehicle", message: "Enter a make or model, or pick a body style." }, 400, cors);
 
-    const cacheKey = new Request("https://cache.driveway-finds/search?" + canonicalQuery(c));
+    const cacheKey = new Request("https://cache.driveway-finds/search/v2?" + canonicalQuery(c));
     const cache = typeof caches !== "undefined" ? caches.default : null;
     if (cache && url.searchParams.get("fresh") !== "1") {
       const hit = await cache.match(cacheKey);
@@ -189,29 +189,60 @@ async function getJson(url, init) {
   }
 }
 
-export async function searchAll(c, env) {
-  const jobs = [];
-  for (const v of c.vehicles.length ? c.vehicles : [""]) {
-    const mm = splitVehicle(v);
-    if (env.MARKETCHECK_KEY) {
-      jobs.push(timed("MarketCheck", () => marketcheck(c, mm, env, "dealer")));
-      jobs.push(timed("MarketCheck private sellers", () => marketcheck(c, mm, env, "private")));
-    }
-    if (env.AUTODEV_KEY) jobs.push(timed("Auto.dev", () => autodev(c, mm, env)));
-    if (env.EBAY_CLIENT_ID && env.EBAY_CLIENT_SECRET) jobs.push(timed("eBay Motors", () => ebay(c, v, env)));
+/* Looser versions of the search, used when the exact one finds few cars. Make, model and distance never loosen. */
+export function looserSearches(c) {
+  const out = [];
+  if (c.yearMin || c.yearMax) {
+    const lo = c.yearMin || c.yearMax, hi = c.yearMax || c.yearMin;
+    // Nearby years only; the searched years were already covered.
+    out.push(Object.assign({}, c, { yearMin: Math.max(1950, lo - 3), yearMax: Math.min(2035, hi + 3), skipYears: [lo, hi] }));
   }
-  const done = await Promise.all(jobs);
-  // One status line per source, adding up counts across vehicles.
+  if (c.body || c.drive || c.fuel || c.trans || c.cyl || c.engine) out.push(Object.assign({}, c, { body: "", drive: "", fuel: "", trans: "", cyl: "", engine: "" }));
+  if (c.priceMin || c.priceMax || c.milesMax) out.push(Object.assign({}, c, { priceMin: null, priceMax: null, milesMax: null }));
+  return out;
+}
+const ENOUGH_EXACT = 10;
+
+export async function searchAll(c, env) {
+  const vehicles = c.vehicles.length ? c.vehicles : [""];
+  const run = (crit, withEbay) => {
+    const jobs = [];
+    for (const v of vehicles) {
+      const mm = splitVehicle(v);
+      if (env.MARKETCHECK_KEY) {
+        jobs.push(timed("MarketCheck", () => marketcheck(crit, mm, env, "dealer")));
+        jobs.push(timed("MarketCheck private sellers", () => marketcheck(crit, mm, env, "private")));
+      }
+      if (env.AUTODEV_KEY) jobs.push(timed("Auto.dev", () => autodev(crit, mm, env)));
+      if (withEbay && env.EBAY_CLIENT_ID && env.EBAY_CLIENT_SECRET) jobs.push(timed("eBay Motors", () => ebay(crit, v, env)));
+    }
+    return Promise.all(jobs);
+  };
+  let done = await run(c, true);
+  const exactSoFar = merge([].concat(...done.map((d) => d.results))).filter((l) => grade(l, c).exact).length;
+  let widened = false;
+  if (exactSoFar < ENOUGH_EXACT) {
+    const extra = await Promise.all(looserSearches(c).map((crit) => run(crit, false)));
+    for (const e of extra) done = done.concat(e);
+    widened = extra.length > 0;
+  }
+  // One status line per source, adding up counts across vehicles and looser searches.
   const sources = [];
   for (const d of done) {
     const s = sources.find((x) => x.name === d.name);
     if (!s) sources.push({ name: d.name, ok: d.ok, count: d.count, error: d.error || "" });
     else { s.count += d.count; s.ok = s.ok && d.ok; if (d.error && !s.error) s.error = d.error; }
   }
-  const all = [].concat(...done.map((d) => d.results));
-  const results = merge(all).filter((l) => fits(l, c));
-  results.sort((a, b) => (b.listedAt || 0) - (a.listedAt || 0));
-  return { results, sources, enabled: enabledSources(env), at: Date.now() };
+  const results = merge([].concat(...done.map((d) => d.results))).map((l) => Object.assign(l, grade(l, c)));
+  results.sort(byMatch);
+  return { results, sources, enabled: enabledSources(env), widened, at: Date.now() };
+}
+/* Exact matches first, newest first; then the rest by fewest misses, nearest year, newest. */
+export function byMatch(a, b) {
+  if (a.exact !== b.exact) return a.exact ? -1 : 1;
+  if (!a.exact && a.misses !== b.misses) return a.misses - b.misses;
+  if (!a.exact && a.yearGap !== b.yearGap) return a.yearGap - b.yearGap;
+  return (b.listedAt || 0) - (a.listedAt || 0);
 }
 
 /* Same VIN, or same link, is one car. The copy with the most photos and details wins,
@@ -235,23 +266,43 @@ export function merge(list) {
   return out;
 }
 function score(l) { return (l.photo ? 4 : 0) + (l.price ? 2 : 0) + (l.miles != null ? 1 : 0) + (l.vin ? 1 : 0); }
-/* Services sometimes ignore a filter, so check again here. Missing values are kept. */
-export function fits(l, c) {
-  if (c.yearMin && l.year && l.year < c.yearMin) return false;
-  if (c.yearMax && l.year && l.year > c.yearMax) return false;
-  if (c.priceMax && l.price && l.price > c.priceMax) return false;
-  if (c.priceMin && l.price && l.price < c.priceMin) return false;
-  if (c.milesMax && l.miles != null && l.miles > c.milesMax) return false;
-  // Spec filters only drop a listing that states a different value; one that doesn't say is kept.
-  if (c.drive && l.drive && l.drive !== c.drive) return false;
-  if (c.fuel && l.fuel && l.fuel !== c.fuel) return false;
-  if (c.trans && l.trans && l.trans !== c.trans) return false;
-  if (c.cyl && l.cyl && Number(c.cyl) !== l.cyl) return false;
-  if (c.body && l.body && l.body !== "car" && l.body !== c.body) return false;
-  if (c.body && l.body === "car" && !["sedan", "coupe", "hatchback", "wagon", "convertible"].includes(c.body)) return false;
-  if (c.engine) { const hay = (l.engine + " " + l.title).toLowerCase(); if (l.engine && !hay.includes(c.engine.toLowerCase())) return false; }
-  return true;
+/* Grades one listing against every filter that was set. Each check is ok: true (meets it), false (states
+   a different value) or null (the listing doesn't say). A listing is exact when nothing is false. */
+const LABEL = {
+  body: { pickup: "Pickup", suv: "SUV", sedan: "Sedan", coupe: "Coupe", hatchback: "Hatchback", wagon: "Wagon", convertible: "Convertible", van: "Van", minivan: "Minivan" },
+  drive: { "4wd": "4x4", awd: "AWD", rwd: "RWD", fwd: "FWD" }, fuel: { gas: "Gas", diesel: "Diesel", hybrid: "Hybrid", electric: "Electric" },
+  trans: { automatic: "Automatic", manual: "Manual" },
+};
+const money = (n) => "$" + Number(n).toLocaleString("en-US");
+export function grade(l, c) {
+  const checks = [];
+  const add = (key, label, ok, has) => checks.push({ key, label, ok: has ? ok : null });
+  if (c.yearMin || c.yearMax) {
+    const lo = c.yearMin || 1950, hi = c.yearMax || 2035;
+    const label = c.yearMin && c.yearMax ? (lo === hi ? String(lo) : lo + "–" + hi) : c.yearMin ? lo + " or newer" : hi + " or older";
+    add("year", label, l.year >= lo && l.year <= hi, !!l.year);
+  }
+  if (c.engine) {
+    const hay = (l.engine + " " + l.title).toLowerCase(), want = c.engine.toLowerCase();
+    add("engine", /^\d(\.\d)?$/.test(c.engine) ? c.engine + "L" : c.engine, hay.includes(want), !!l.engine || hay.includes(want));
+  }
+  if (c.drive) add("drive", LABEL.drive[c.drive], l.drive === c.drive, !!l.drive);
+  if (c.cyl) add("cyl", c.cyl + " cyl", l.cyl === Number(c.cyl), !!l.cyl);
+  if (c.body) add("body", LABEL.body[c.body], l.body === c.body || (l.body === "car" && ["sedan", "coupe", "hatchback", "wagon", "convertible"].includes(c.body)), !!l.body);
+  if (c.fuel) add("fuel", LABEL.fuel[c.fuel], l.fuel === c.fuel, !!l.fuel);
+  if (c.trans) add("trans", LABEL.trans[c.trans], l.trans === c.trans, !!l.trans);
+  if (c.priceMin || c.priceMax) {
+    const label = c.priceMin && c.priceMax ? money(c.priceMin) + "–" + money(c.priceMax) : c.priceMax ? "Under " + money(c.priceMax) : "Over " + money(c.priceMin);
+    add("price", label, (!c.priceMin || l.price >= c.priceMin) && (!c.priceMax || l.price <= c.priceMax), !!l.price);
+  }
+  if (c.milesMax) add("miles", "Under " + Number(c.milesMax).toLocaleString("en-US") + " mi", l.miles <= c.milesMax, l.miles != null);
+  const misses = checks.filter((x) => x.ok === false).length;
+  const lo = c.yearMin || c.yearMax, hi = c.yearMax || c.yearMin;
+  const yearGap = l.year && lo ? (l.year < lo ? lo - l.year : l.year > hi ? l.year - hi : 0) : 0;
+  return { checks, exact: misses === 0, misses, yearGap };
 }
+/* Kept for callers that only need yes or no. */
+export function fits(l, c) { return grade(l, c).exact; }
 
 /* ---------- normalizing ---------- */
 function num(v) { if (v == null || v === "") return null; const n = Number(String(v).replace(/[^\d.]/g, "")); return isFinite(n) && n > 0 ? n : (n === 0 ? 0 : null); }
@@ -308,7 +359,14 @@ async function autodev(c, mm, env) {
   const p = new URLSearchParams({ limit: String(MAX_PER_SOURCE) }); // the free plan returns at most 20
   if (mm.make) p.set("vehicle.make", properMake(mm.make));
   if (mm.model) p.set("vehicle.model", modelSpellings(mm.model));
-  if (c.yearMin || c.yearMax) p.set("vehicle.year", (c.yearMin || 1950) + "-" + (c.yearMax || 2035));
+  if (c.skipYears) {
+    const ys = [];
+    for (let y = c.yearMin; y <= c.yearMax; y++) if (y < c.skipYears[0] || y > c.skipYears[1]) ys.push(y);
+    p.set("vehicle.year", ys.join(","));
+  } else if (c.yearMin || c.yearMax) p.set("vehicle.year", (c.yearMin || 1950) + "-" + (c.yearMax || 2035));
+  // An engine size like "5.3" becomes "5.3L*", which Auto.dev matches against "5.3L 8Cyl ...". Names are checked afterwards.
+  const size = String(c.engine || "").match(/^(\d{1,2}\.\d)\s*l?$/i);
+  if (size) p.set("vehicle.engine", size[1] + "L*");
   if (c.priceMin || c.priceMax) p.set("retailListing.price", (c.priceMin || 1) + "-" + (c.priceMax || 10000000));
   if (c.milesMax) p.set("retailListing.miles", "0-" + c.milesMax);
   if (c.body) p.set("vehicle.bodyStyle", BODY_AUTODEV[c.body]);

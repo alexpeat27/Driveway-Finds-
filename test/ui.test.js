@@ -186,7 +186,7 @@ test("Search everything shows merged results with photos and saves to Finds", { 
     assert.equal(q.get("body"), "pickup");
     assert.equal(q.get("drive"), "4wd");
     assert.equal(q.get("dist"), "any");
-    assert.match(await page.textContent("#r-head"), /2 results for Toyota Tacoma/);
+    assert.match(await page.textContent("#r-head"), /2 best matches for Toyota Tacoma/);
     assert.match(await page.textContent("#r-status"), /Auto\.dev: failed/);
     assert.match(await page.textContent("#r-status"), /free allowance used up/);
     const first = page.locator("#r-list .rc").first();
@@ -258,6 +258,39 @@ test("VIN lookup: a second VIN replaces the auto-filled title, and NHTSA's 400 m
     await page.click("#a-vin-go");
     await page.waitForFunction(() => /Motor Coach/.test(document.getElementById("a-vin-out").textContent));
     assert.equal(await page.inputValue("#a-title"), "My pick");
+  } finally {
+    await browser.close();
+  }
+});
+
+test("results split into best matches (green) and other results with ✓ ✗ ? per filter", { skip: !chromium && "playwright is not installed" }, async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
+  const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "X-Access-Code" };
+  const ck = (key, label, ok) => ({ key, label, ok });
+  await page.route("https://w.example/**", (r) => r.request().method() === "OPTIONS" ? r.fulfill({ status: 204, headers: cors }) : r.fulfill({ headers: cors, contentType: "application/json", body: JSON.stringify({
+    enabled: ["Auto.dev"], sources: [{ name: "Auto.dev", ok: true, count: 3 }], widened: true, results: [
+      { source: "Auto.dev", title: "1999 Chevrolet Tahoe LT", price: 9000, url: "https://d.example/1", exact: false, misses: 1,
+        checks: [ck("year", "1999", true), ck("engine", "5.3L", false), ck("drive", "4x4", true)] },
+      { source: "Auto.dev", title: "2000 Chevrolet Tahoe LS", price: 7000, url: "https://d.example/2", exact: false, misses: 1,
+        checks: [ck("year", "1999", false), ck("engine", "5.3L", true), ck("drive", "4x4", null)] },
+    ] }) }));
+  try {
+    await page.goto(PAGE);
+    await page.evaluate(() => { localStorage.clear(); localStorage.setItem("driveway-finds-v1", JSON.stringify({ searches: [], finds: [], settings: { workerUrl: "https://w.example" } })); localStorage.setItem("driveway-finds-access", "x"); });
+    await page.reload();
+    await page.fill("#vehicles", "chevy tahoe");
+    await page.click("#search-all");
+    await page.waitForSelector("#r-list .rc");
+    assert.match(await page.textContent("#r-list"), /No exact matches/);
+    assert.match(await page.textContent("#r-list"), /Other results \(2\)/);
+    assert.equal(await page.locator("#r-list .rc.exact").count(), 0);
+    const first = page.locator("#r-list .rc").first();
+    assert.deepEqual(await first.locator(".chk").allTextContents(), ["✓ 1999", "✗ 5.3L", "✓ 4x4"]);
+    assert.deepEqual(await page.locator("#r-list .rc").nth(1).locator(".chk.unk").allTextContents(), ["? 4x4"]);
+    // Sorting by price keeps the groups and reorders within them.
+    await page.selectOption("#r-sort", "price");
+    assert.match(await page.locator("#r-list .rc").first().textContent(), /2000 Chevrolet Tahoe/);
   } finally {
     await browser.close();
   }
