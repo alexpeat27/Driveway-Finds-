@@ -213,6 +213,14 @@ test("no vehicle is a clear error", async () => {
   assert.equal(r.status, 400);
 });
 
+test("opening the server in a browser goes to the website", async () => {
+  const r = await W.default.fetch(new Request("https://w.example/", { headers: { Accept: "text/html,application/xhtml+xml" } }), ENV);
+  assert.equal(r.status, 302);
+  assert.equal(r.headers.get("Location"), "https://alexpeat27.github.io/Driveway-Finds-/");
+  const api = await W.default.fetch(new Request("https://w.example/health", { headers: { Accept: "text/html" } }), ENV);
+  assert.equal(api.status, 200);
+});
+
 test("health check lists the sources that have keys, without revealing them", async () => {
   const r = await W.default.fetch(new Request("https://w.example/"), { ACCESS_CODE: "x", MARKETCHECK_KEY: "secret-value" });
   const text = await r.text();

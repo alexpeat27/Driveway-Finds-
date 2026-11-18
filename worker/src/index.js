@@ -12,6 +12,7 @@
      ALLOWED_ORIGINS      optional. Comma-separated page addresses allowed to call this, e.g.
                           https://alexample.github.io. Leave empty to allow any page that knows the access code. */
 
+const SITE_URL = "https://alexpeat27.github.io/Driveway-Finds-/";
 const MAX_PER_SOURCE = 50;
 const CACHE_SECONDS = 900; // repeat searches within 15 minutes reuse the last answer and spend no quota
 const TIMEOUT_MS = 12000;
@@ -22,6 +23,10 @@ export default {
     const cors = corsHeaders(origin, env);
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     const url = new URL(request.url);
+    // Someone opening the server's address in a browser is sent to the website itself.
+    if (url.pathname === "/" && request.method === "GET" && /text\/html/.test(request.headers.get("Accept") || "")) {
+      return Response.redirect(SITE_URL, 302);
+    }
     if (url.pathname === "/" || url.pathname === "/health") {
       return json({ ok: true, sources: enabledSources(env) }, 200, cors);
     }
